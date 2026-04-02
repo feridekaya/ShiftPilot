@@ -5,8 +5,8 @@ import Button from '@/components/ui/Button';
 
 const roleLabel: Record<string, string> = {
   manager: 'Yönetici',
-  supervisor: 'Süpervizör',
-  employee: 'Çalışan',
+  supervisor: 'Şef',
+  employee: 'Personel',
 };
 
 export default function Navbar() {

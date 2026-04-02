@@ -111,8 +111,8 @@ export default function UsersPage() {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">Rol</label>
             <select className="rounded-md border border-gray-300 px-3 py-2 text-sm" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}>
-              <option value="employee">Çalışan</option>
-              <option value="supervisor">Süpervizör</option>
+              <option value="employee">Personel</option>
+              <option value="supervisor">Şef</option>
               <option value="manager">Yönetici</option>
             </select>
           </div>

@@ -76,7 +76,7 @@ export default function AssignmentsPage() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
-            <tr>{['Çalışan', 'Görev', 'Bölge', 'Vardiya', 'Tarih', 'Durum'].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}</tr>
+            <tr>{['Personel', 'Görev', 'Bölge', 'Vardiya', 'Tarih', 'Durum'].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map(a => (
@@ -99,7 +99,7 @@ export default function AssignmentsPage() {
           {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">{error}</div>}
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Çalışan</label>
+            <label className="text-sm font-medium text-gray-700">Personel</label>
             <select className="rounded-md border border-gray-300 px-3 py-2 text-sm" value={form.user_id} onChange={e => setForm({ ...form, user_id: Number(e.target.value) })} required>
               <option value={0} disabled>Seç...</option>
               {employees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}

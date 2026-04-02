@@ -9,7 +9,7 @@ import Modal from '@/components/ui/Modal';
 import { AxiosError } from 'axios';
 
 const ALL_ROLES: Role[] = ['manager', 'supervisor', 'employee'];
-const roleLabel: Record<Role, string> = { manager: 'Yönetici', supervisor: 'Süpervizör', employee: 'Çalışan' };
+const roleLabel: Record<Role, string> = { manager: 'Yönetici', supervisor: 'Şef', employee: 'Personel' };
 const emptyForm = { title: '', description: '', zone_id: 0, requires_photo: true, coefficient: 1, allowed_roles: ['employee'] as Role[], allowed_genders: '' };
 
 export default function TasksPage() {
