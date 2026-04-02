@@ -1,5 +1,13 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ZoneViewSet, ShiftViewSet, TaskViewSet, TaskScheduleViewSet
+
+router = DefaultRouter()
+router.register(r'zones', ZoneViewSet, basename='zone')
+router.register(r'shifts', ShiftViewSet, basename='shift')
+router.register(r'schedules', TaskScheduleViewSet, basename='taskschedule')
+router.register(r'', TaskViewSet, basename='task')  # must be last
 
 urlpatterns = [
-    # Endpoints will be added in the next phase
+    path('', include(router.urls)),
 ]
