@@ -1,5 +1,10 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import UserViewSet
+
+router = DefaultRouter()
+router.register(r'', UserViewSet, basename='user')
 
 urlpatterns = [
-    # Endpoints will be added in the next phase
+    path('', include(router.urls)),
 ]
