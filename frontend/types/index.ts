@@ -1,4 +1,9 @@
 export type Role = 'manager' | 'supervisor' | 'employee';
+
+export interface StaffTeam {
+  id: number;
+  name: string;
+}
 export type Gender = 'male' | 'female';
 export type AssignmentStatus = 'pending' | 'completed' | 'approved' | 'rejected';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -10,6 +15,7 @@ export interface User {
   email: string;
   role: Role;
   gender: Gender | null;
+  team: StaffTeam | null;
   is_active: boolean;
   created_at: string;
 }
