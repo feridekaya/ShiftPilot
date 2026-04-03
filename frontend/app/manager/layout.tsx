@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
 const managerLinks = [
+  { href: '/manager/store', label: 'Dükkan' },
   { href: '/manager/users', label: 'Kullanıcılar' },
   { href: '/manager/staff', label: 'Personel' },
   { href: '/manager/tasks', label: 'Görevler' },
