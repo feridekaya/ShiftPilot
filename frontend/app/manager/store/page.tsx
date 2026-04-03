@@ -196,16 +196,8 @@ export default function StorePage() {
               </div>
 
               {/* Floor plan */}
-              <div className={`rounded-2xl p-3 md:p-4 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/60`}>
-                {/* Compass-like label */}
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <span className="text-slate-700 text-[9px] uppercase tracking-widest font-bold">← Mutfak</span>
-                  <span className="text-slate-700 text-[9px] uppercase tracking-widest font-bold">Cadde →</span>
-                </div>
+              <div className="rounded-2xl p-3 md:p-5 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/60">
                 <FloorLayout data={zoneData} />
-                <div className="flex justify-center mt-3">
-                  <span className="text-slate-700 text-[9px] uppercase tracking-widest font-bold">↓ Çıkış</span>
-                </div>
               </div>
             </div>
           );

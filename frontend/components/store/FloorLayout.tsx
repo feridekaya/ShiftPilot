@@ -8,6 +8,18 @@ interface FloorLayoutProps {
   data: ZoneData;
 }
 
+// 8-row grid — Arka 2 rows, Giriş 4 rows, Kabile & Sakin 2 rows each
+const GRID_AREAS = `
+  "arka   arka   arka   arka   arka"
+  "arka   arka   arka   arka   arka"
+  "orta   orta   yan    wck    wce"
+  "orta   orta   yan    wconu  wconu"
+  "giris  giris  yan    kabile kabile"
+  "giris  giris  yan    kabile kabile"
+  "giris  giris  yan    sakin  sakin"
+  "giris  giris  yan    sakin  sakin"
+`;
+
 const ZONES = [
   { key: 'arka',   label: 'Arka',        accent: 'amber',   area: 'arka'   },
   { key: 'wck',    label: 'Kadın WC',    accent: 'teal',    area: 'wck'    },
@@ -20,15 +32,6 @@ const ZONES = [
   { key: 'sakin',  label: 'Sakin Salon', accent: 'cyan',    area: 'sakin'  },
 ];
 
-// Desktop floor plan — 5-column grid matching actual restaurant layout
-const GRID_AREAS = `
-  "arka   arka   arka   arka   arka"
-  "orta   orta   yan    wck    wce"
-  "orta   orta   yan    wconu  wconu"
-  "giris  giris  yan    kabile kabile"
-  "giris  giris  yan    sakin  sakin"
-`;
-
 export default function FloorLayout({ data }: FloorLayoutProps) {
   return (
     <>
@@ -38,8 +41,8 @@ export default function FloorLayout({ data }: FloorLayoutProps) {
         style={{
           gridTemplateAreas: GRID_AREAS,
           gridTemplateColumns: '1.1fr 1.1fr 0.85fr 1fr 1fr',
-          gridAutoRows: 'minmax(72px, auto)',
-          gap: '7px',
+          gridAutoRows: 'minmax(68px, auto)',
+          gap: '8px',
         }}
       >
         {ZONES.map(z => (
@@ -55,25 +58,15 @@ export default function FloorLayout({ data }: FloorLayoutProps) {
 
       {/* ── Mobile: 2-column responsive grid ── */}
       <div className="md:hidden grid grid-cols-2 gap-2">
-        {/* Arka spans full width */}
-        <ZoneCard
-          label="Arka"
-          employees={data['arka'] ?? []}
-          accent="amber"
-          className="col-span-2"
-          compact
-        />
-        {/* WC pair */}
-        <ZoneCard label="Kadın WC"   employees={data['wck']    ?? []} accent="teal"    compact />
-        <ZoneCard label="Erkek WC"   employees={data['wce']    ?? []} accent="slate"   compact />
-        {/* WC Önü */}
-        <ZoneCard label="WC Önü"     employees={data['wconu']  ?? []} accent="slate"   className="col-span-2" compact />
-        {/* Main zones */}
-        <ZoneCard label="Orta"       employees={data['orta']   ?? []} accent="indigo"  compact />
-        <ZoneCard label="Yan Dükkan" employees={data['yan']    ?? []} accent="violet"  compact />
-        <ZoneCard label="Giriş"      employees={data['giris']  ?? []} accent="emerald" compact />
-        <ZoneCard label="Kabile Kafa"employees={data['kabile'] ?? []} accent="rose"    compact />
-        <ZoneCard label="Sakin Salon"employees={data['sakin']  ?? []} accent="cyan"    className="col-span-2" compact />
+        <ZoneCard label="Arka"        employees={data['arka']   ?? []} accent="amber"   className="col-span-2 min-h-[90px]" />
+        <ZoneCard label="Kadın WC"    employees={data['wck']    ?? []} accent="teal"    compact />
+        <ZoneCard label="Erkek WC"    employees={data['wce']    ?? []} accent="slate"   compact />
+        <ZoneCard label="WC Önü"      employees={data['wconu']  ?? []} accent="slate"   className="col-span-2" compact />
+        <ZoneCard label="Orta"        employees={data['orta']   ?? []} accent="indigo"  compact />
+        <ZoneCard label="Yan Dükkan"  employees={data['yan']    ?? []} accent="violet"  compact />
+        <ZoneCard label="Giriş"       employees={data['giris']  ?? []} accent="emerald" className="col-span-2 min-h-[80px]" compact />
+        <ZoneCard label="Kabile Kafa" employees={data['kabile'] ?? []} accent="rose"    compact />
+        <ZoneCard label="Sakin Salon" employees={data['sakin']  ?? []} accent="cyan"    compact />
       </div>
     </>
   );
