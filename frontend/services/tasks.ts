@@ -40,6 +40,15 @@ export async function createZone(payload: { name: string; description?: string }
   return data;
 }
 
+export async function updateZone(id: number, payload: { name: string; description?: string }): Promise<Zone> {
+  const { data } = await api.put<Zone>(`/api/tasks/zones/${id}/`, payload);
+  return data;
+}
+
+export async function deleteZone(id: number): Promise<void> {
+  await api.delete(`/api/tasks/zones/${id}/`);
+}
+
 // Shifts
 export async function getShifts(): Promise<Shift[]> {
   const { data } = await api.get<Shift[]>('/api/tasks/shifts/');
@@ -49,6 +58,15 @@ export async function getShifts(): Promise<Shift[]> {
 export async function createShift(payload: { name: string; start_time: string; end_time: string }): Promise<Shift> {
   const { data } = await api.post<Shift>('/api/tasks/shifts/', payload);
   return data;
+}
+
+export async function updateShift(id: number, payload: { name: string; start_time: string; end_time: string }): Promise<Shift> {
+  const { data } = await api.put<Shift>(`/api/tasks/shifts/${id}/`, payload);
+  return data;
+}
+
+export async function deleteShift(id: number): Promise<void> {
+  await api.delete(`/api/tasks/shifts/${id}/`);
 }
 
 // Schedules

@@ -18,13 +18,13 @@ class ReadOnlyOrManagerMixin:
 class ZoneViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
-    http_method_names = ['get', 'post', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
 
 class ShiftViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     queryset = Shift.objects.all().order_by('start_time')
     serializer_class = ShiftSerializer
-    http_method_names = ['get', 'post', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
 
 class TaskViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
