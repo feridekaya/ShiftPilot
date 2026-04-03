@@ -56,11 +56,18 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = TaskSubmission.objects.select_related(
-            'assignment__user', 'assignment__task', 'approved_by'
+            'assignment__user', 'assignment__task', 'assignment__zone',
+            'assignment__shift', 'approved_by'
         )
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(approval_status=status_filter)
+        assignment_id = self.request.query_params.get('assignment_id')
+        if assignment_id:
+            qs = qs.filter(assignment_id=assignment_id)
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            qs = qs.filter(assignment__user_id=user_id)
         return qs.order_by('-submitted_at')
 
     def get_serializer_context(self):
@@ -98,6 +105,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         submission.approved_by = request.user
         submission.note = serializer.validated_data.get('note', submission.note)
         submission.save()
-        submission.assignment.status = 'rejected'
+        # Return task to employee as pending so they can resubmit
+        submission.assignment.status = 'pending'
         submission.assignment.save(update_fields=['status'])
         return Response(TaskSubmissionSerializer(submission, context={'request': request}).data)

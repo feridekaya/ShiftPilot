@@ -17,6 +17,35 @@ class ShiftSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'start_time', 'end_time']
 
 
+class TaskScheduleSerializer(serializers.ModelSerializer):
+    task_id = serializers.PrimaryKeyRelatedField(
+        queryset=Task.objects.all(), source='task', write_only=True, required=False
+    )
+
+    class Meta:
+        model = TaskSchedule
+        fields = ['id', 'task_id', 'frequency', 'times_per_day', 'days_of_week', 'month_day', 'month']
+
+    def validate(self, data):
+        frequency = data.get('frequency', getattr(self.instance, 'frequency', None))
+        days = data.get('days_of_week', [])
+        if frequency in ('daily', 'multiple_daily', 'monthly', 'yearly'):
+            data['days_of_week'] = []
+        elif frequency == 'weekly':
+            if not days:
+                raise serializers.ValidationError(
+                    {'days_of_week': 'Haftalık tekrar için gün seçilmeli.'}
+                )
+            invalid = [d for d in days if d not in VALID_DAYS]
+            if invalid:
+                raise serializers.ValidationError(
+                    {'days_of_week': f'Geçersiz gün değerleri: {invalid}'}
+                )
+        if frequency != 'multiple_daily':
+            data.setdefault('times_per_day', 1)
+        return data
+
+
 class TaskSerializer(serializers.ModelSerializer):
     zone = ZoneSerializer(read_only=True)
     zone_id = serializers.PrimaryKeyRelatedField(
@@ -26,44 +55,17 @@ class TaskSerializer(serializers.ModelSerializer):
     allowed_roles = serializers.ListField(
         child=serializers.ChoiceField(choices=VALID_ROLES), default=list
     )
+    schedule = TaskScheduleSerializer(read_only=True)
 
     class Meta:
         model = Task
         fields = [
             'id', 'title', 'description', 'zone', 'zone_id',
             'requires_photo', 'coefficient', 'allowed_roles',
-            'allowed_genders', 'created_by',
+            'allowed_genders', 'created_by', 'schedule',
         ]
 
     def validate_coefficient(self, value):
         if value < 1:
             raise serializers.ValidationError('Coefficient must be at least 1.')
         return value
-
-
-class TaskScheduleSerializer(serializers.ModelSerializer):
-    task = TaskSerializer(read_only=True)
-    task_id = serializers.PrimaryKeyRelatedField(
-        queryset=Task.objects.all(), source='task', write_only=True
-    )
-
-    class Meta:
-        model = TaskSchedule
-        fields = ['id', 'task', 'task_id', 'frequency', 'days_of_week']
-
-    def validate(self, data):
-        frequency = data.get('frequency', getattr(self.instance, 'frequency', None))
-        days = data.get('days_of_week', [])
-        if frequency == 'daily':
-            data['days_of_week'] = []
-        elif frequency == 'weekly':
-            if not days:
-                raise serializers.ValidationError(
-                    {'days_of_week': 'days_of_week is required for weekly frequency.'}
-                )
-            invalid = [d for d in days if d not in VALID_DAYS]
-            if invalid:
-                raise serializers.ValidationError(
-                    {'days_of_week': f'Invalid day values: {invalid}. Use 0 (Mon) to 6 (Sun).'}
-                )
-        return data

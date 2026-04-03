@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Task, Zone, Role } from '@/types';
+import { Task, Zone, Role, TaskSchedule, Frequency } from '@/types';
 import * as taskService from '@/services/tasks';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -10,7 +10,56 @@ import { AxiosError } from 'axios';
 
 const ALL_ROLES: Role[] = ['manager', 'supervisor', 'employee'];
 const roleLabel: Record<Role, string> = { manager: 'Yönetici', supervisor: 'Şef', employee: 'Personel' };
-const emptyForm = { title: '', description: '', zone_id: 0, requires_photo: true, coefficient: 1, allowed_roles: ['employee'] as Role[], allowed_genders: '' };
+const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+const freqLabel: Record<Frequency, string> = {
+  multiple_daily: 'Günde birden fazla',
+  daily: 'Her gün',
+  weekly: 'Haftada',
+  monthly: 'Ayda bir',
+  yearly: 'Yılda bir',
+};
+
+const emptyForm = {
+  title: '',
+  description: '',
+  zone_id: 0,
+  requires_photo: true,
+  coefficient: 1,
+  allowed_roles: ['employee'] as Role[],
+  allowed_genders: '',
+};
+
+type ScheduleForm = {
+  enabled: boolean;
+  frequency: Frequency;
+  times_per_day: number;
+  days_of_week: number[];
+  month_day: number;
+  month: number;
+};
+
+const emptySchedule: ScheduleForm = {
+  enabled: false,
+  frequency: 'daily',
+  times_per_day: 2,
+  days_of_week: [],
+  month_day: 1,
+  month: 1,
+};
+
+function scheduleToLabel(s: TaskSchedule | null): string {
+  if (!s) return '—';
+  switch (s.frequency) {
+    case 'multiple_daily': return `Günde ${s.times_per_day} kez`;
+    case 'daily': return 'Her gün';
+    case 'weekly': return `Haftalık (${s.days_of_week.map(d => DAYS[d]).join(', ')})`;
+    case 'monthly': return `Her ayın ${s.month_day}. günü`;
+    case 'yearly': return `Her yıl ${s.month_day} ${MONTHS[(s.month ?? 1) - 1]}`;
+    default: return '—';
+  }
+}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -18,6 +67,7 @@ export default function TasksPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>(emptySchedule);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -26,33 +76,104 @@ export default function TasksPage() {
     taskService.getZones().then(setZones);
   }, []);
 
-  function openCreate() { setEditing(null); setForm(emptyForm); setError(''); setIsOpen(true); }
+  function openCreate() {
+    setEditing(null);
+    setForm(emptyForm);
+    setScheduleForm(emptySchedule);
+    setError('');
+    setIsOpen(true);
+  }
+
   function openEdit(t: Task) {
     setEditing(t);
-    setForm({ title: t.title, description: t.description, zone_id: t.zone?.id ?? 0, requires_photo: t.requires_photo, coefficient: t.coefficient, allowed_roles: t.allowed_roles, allowed_genders: t.allowed_genders ?? '' });
-    setError(''); setIsOpen(true);
+    setForm({
+      title: t.title,
+      description: t.description,
+      zone_id: t.zone?.id ?? 0,
+      requires_photo: t.requires_photo,
+      coefficient: t.coefficient,
+      allowed_roles: t.allowed_roles,
+      allowed_genders: t.allowed_genders ?? '',
+    });
+    if (t.schedule) {
+      setScheduleForm({
+        enabled: true,
+        frequency: t.schedule.frequency,
+        times_per_day: t.schedule.times_per_day ?? 2,
+        days_of_week: t.schedule.days_of_week ?? [],
+        month_day: t.schedule.month_day ?? 1,
+        month: t.schedule.month ?? 1,
+      });
+    } else {
+      setScheduleForm(emptySchedule);
+    }
+    setError('');
+    setIsOpen(true);
   }
 
   function toggleRole(role: Role) {
-    setForm(f => ({ ...f, allowed_roles: f.allowed_roles.includes(role) ? f.allowed_roles.filter(r => r !== role) : [...f.allowed_roles, role] }));
+    setForm(f => ({
+      ...f,
+      allowed_roles: f.allowed_roles.includes(role)
+        ? f.allowed_roles.filter(r => r !== role)
+        : [...f.allowed_roles, role],
+    }));
+  }
+
+  function toggleDay(d: number) {
+    setScheduleForm(f => ({
+      ...f,
+      days_of_week: f.days_of_week.includes(d)
+        ? f.days_of_week.filter(x => x !== d)
+        : [...f.days_of_week, d],
+    }));
+  }
+
+  async function saveSchedule(taskId: number, existingSchedule: TaskSchedule | null) {
+    if (!scheduleForm.enabled) {
+      if (existingSchedule) await taskService.deleteSchedule(existingSchedule.id);
+      return;
+    }
+    const payload: taskService.SchedulePayload = {
+      task_id: taskId,
+      frequency: scheduleForm.frequency,
+      times_per_day: scheduleForm.frequency === 'multiple_daily' ? scheduleForm.times_per_day : 1,
+      days_of_week: scheduleForm.frequency === 'weekly' ? scheduleForm.days_of_week : [],
+      month_day: ['monthly', 'yearly'].includes(scheduleForm.frequency) ? scheduleForm.month_day : null,
+      month: scheduleForm.frequency === 'yearly' ? scheduleForm.month : null,
+    };
+    if (existingSchedule) {
+      await taskService.updateSchedule(existingSchedule.id, payload);
+    } else {
+      await taskService.createSchedule(payload);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setError(''); setSaving(true);
+    e.preventDefault();
+    setError('');
+    setSaving(true);
     try {
       const payload = { ...form, allowed_genders: form.allowed_genders || undefined };
       if (editing) {
         const updated = await taskService.updateTask(editing.id, payload);
-        setTasks(tasks.map(t => t.id === updated.id ? updated : t));
+        await saveSchedule(updated.id, editing.schedule);
+        // Re-fetch to get updated schedule
+        const refreshed = await taskService.getTasks();
+        setTasks(refreshed);
       } else {
         const created = await taskService.createTask(payload);
-        setTasks([...tasks, created]);
+        await saveSchedule(created.id, null);
+        const refreshed = await taskService.getTasks();
+        setTasks(refreshed);
       }
       setIsOpen(false);
     } catch (err) {
       const e = err as AxiosError<Record<string, string[]>>;
       setError(Object.values(e.response?.data ?? {}).flat().join(' ') || 'Hata oluştu.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(t: Task) {
@@ -70,7 +191,11 @@ export default function TasksPage() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
-            <tr>{['Başlık', 'Bölge', 'Katsayı', 'Fotoğraf', 'Roller', 'İşlemler'].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}</tr>
+            <tr>
+              {['Başlık', 'Bölge', 'Katsayı', 'Fotoğraf', 'Tekrarlama', 'Roller', 'İşlemler'].map(h => (
+                <th key={h} className="px-4 py-3 text-left">{h}</th>
+              ))}
+            </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {tasks.map(t => (
@@ -79,6 +204,7 @@ export default function TasksPage() {
                 <td className="px-4 py-3 text-gray-600">{t.zone?.name ?? '-'}</td>
                 <td className="px-4 py-3">{t.coefficient}</td>
                 <td className="px-4 py-3">{t.requires_photo ? 'Evet' : 'Hayır'}</td>
+                <td className="px-4 py-3 text-gray-600 text-xs">{scheduleToLabel(t.schedule)}</td>
                 <td className="px-4 py-3 text-gray-600">{t.allowed_roles.map(r => roleLabel[r]).join(', ')}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>Düzenle</Button>
@@ -124,6 +250,103 @@ export default function TasksPage() {
             <input type="checkbox" checked={form.requires_photo} onChange={e => setForm({ ...form, requires_photo: e.target.checked })} />
             Fotoğraf zorunlu
           </label>
+
+          {/* ── Tekrarlama ── */}
+          <div className="border-t pt-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+              <input
+                type="checkbox"
+                checked={scheduleForm.enabled}
+                onChange={e => setScheduleForm(f => ({ ...f, enabled: e.target.checked }))}
+              />
+              Tekrarlayan Görev
+            </label>
+
+            {scheduleForm.enabled && (
+              <div className="flex flex-col gap-3 pl-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Tekrarlama Sıklığı</label>
+                  <select
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={scheduleForm.frequency}
+                    onChange={e => setScheduleForm(f => ({ ...f, frequency: e.target.value as Frequency, days_of_week: [] }))}
+                  >
+                    {(Object.keys(freqLabel) as Frequency[]).map(f => (
+                      <option key={f} value={f}>{freqLabel[f]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {scheduleForm.frequency === 'multiple_daily' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-600">Günde</span>
+                    <input
+                      type="number"
+                      min={2}
+                      max={24}
+                      className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-center"
+                      value={scheduleForm.times_per_day}
+                      onChange={e => setScheduleForm(f => ({ ...f, times_per_day: Number(e.target.value) }))}
+                    />
+                    <span className="text-gray-600">kez</span>
+                  </div>
+                )}
+
+                {scheduleForm.frequency === 'weekly' && (
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Hangi günler?</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {DAYS.map((d, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => toggleDay(i)}
+                          className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                            scheduleForm.days_of_week.includes(i)
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(scheduleForm.frequency === 'monthly' || scheduleForm.frequency === 'yearly') && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-600">Her ayın</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-center"
+                      value={scheduleForm.month_day}
+                      onChange={e => setScheduleForm(f => ({ ...f, month_day: Number(e.target.value) }))}
+                    />
+                    <span className="text-gray-600">. günü</span>
+                  </div>
+                )}
+
+                {scheduleForm.frequency === 'yearly' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-600">Ay:</span>
+                    <select
+                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      value={scheduleForm.month}
+                      onChange={e => setScheduleForm(f => ({ ...f, month: Number(e.target.value) }))}
+                    >
+                      {MONTHS.map((m, i) => (
+                        <option key={i + 1} value={i + 1}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="secondary" type="button" onClick={() => setIsOpen(false)}>İptal</Button>
             <Button type="submit" isLoading={saving}>Kaydet</Button>

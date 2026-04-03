@@ -52,16 +52,25 @@ export async function createShift(payload: { name: string; start_time: string; e
 }
 
 // Schedules
-export async function getSchedules(): Promise<TaskSchedule[]> {
-  const { data } = await api.get<TaskSchedule[]>('/api/tasks/schedules/');
+export interface SchedulePayload {
+  task_id: number;
+  frequency: string;
+  times_per_day?: number;
+  days_of_week?: number[];
+  month_day?: number | null;
+  month?: number | null;
+}
+
+export async function createSchedule(payload: SchedulePayload): Promise<TaskSchedule> {
+  const { data } = await api.post<TaskSchedule>('/api/tasks/schedules/', payload);
   return data;
 }
 
-export async function createSchedule(payload: {
-  task_id: number;
-  frequency: string;
-  days_of_week?: number[];
-}): Promise<TaskSchedule> {
-  const { data } = await api.post<TaskSchedule>('/api/tasks/schedules/', payload);
+export async function updateSchedule(id: number, payload: Partial<SchedulePayload>): Promise<TaskSchedule> {
+  const { data } = await api.put<TaskSchedule>(`/api/tasks/schedules/${id}/`, payload);
   return data;
+}
+
+export async function deleteSchedule(id: number): Promise<void> {
+  await api.delete(`/api/tasks/schedules/${id}/`);
 }

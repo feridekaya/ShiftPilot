@@ -41,4 +41,4 @@ class TaskViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
 class TaskScheduleViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     queryset = TaskSchedule.objects.select_related('task').all()
     serializer_class = TaskScheduleSerializer
-    http_method_names = ['get', 'post', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
