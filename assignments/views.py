@@ -1,11 +1,25 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.conf import settings
 
 from users.permissions import IsManager, IsManagerOrSupervisor, IsSupervisor
 from .models import Assignment, TaskSubmission
 from .serializers import AssignmentSerializer, TaskSubmissionSerializer, SubmissionApprovalSerializer
+from .utils import get_business_date
+
+
+class BusinessDateView(GenericAPIView):
+    """Returns the current business date and cutoff hour."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            'business_date': str(get_business_date()),
+            'cutoff_hour': getattr(settings, 'BUSINESS_DAY_CUTOFF_HOUR', 4),
+        })
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):

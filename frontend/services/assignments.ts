@@ -1,6 +1,11 @@
 import { Assignment } from '@/types';
 import api from './api';
 
+export async function getBusinessDate(): Promise<{ business_date: string; cutoff_hour: number }> {
+  const { data } = await api.get('/api/assignments/business-date/');
+  return data;
+}
+
 export async function getAssignments(filters?: { user_id?: number }): Promise<Assignment[]> {
   const params = filters?.user_id ? `?user_id=${filters.user_id}` : '';
   const { data } = await api.get<Assignment[]>(`/api/assignments/${params}`);

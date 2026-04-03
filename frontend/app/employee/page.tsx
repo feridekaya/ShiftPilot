@@ -16,14 +16,20 @@ export default function EmployeePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-
-  const today = new Date().toISOString().split('T')[0];
+  const [businessDate, setBusinessDate] = useState('');
 
   useEffect(() => {
-    assignmentService.getAssignments()
-      .then(all => setAssignments(all.filter(a => a.date === today)))
-      .finally(() => setLoading(false));
-  }, [today]);
+    async function load() {
+      const [all, dateInfo] = await Promise.all([
+        assignmentService.getAssignments(),
+        assignmentService.getBusinessDate(),
+      ]);
+      setBusinessDate(dateInfo.business_date);
+      setAssignments(all.filter(a => a.date === dateInfo.business_date));
+      setLoading(false);
+    }
+    load();
+  }, []);
 
   async function handleCapture(dataUrl: string) {
     if (!selectedId) return;
@@ -46,7 +52,7 @@ export default function EmployeePage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-6">Bugünkü Görevlerim — {today}</h1>
+      <h1 className="text-xl font-bold mb-6">Bugünkü Görevlerim — {businessDate}</h1>
 
       {assignments.length === 0 && (
         <div className="text-center text-gray-400 mt-20">Bugün için atanmış görev yok.</div>

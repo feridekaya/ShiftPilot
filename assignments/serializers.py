@@ -38,8 +38,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         ]
 
     def get_submissions(self, obj):
-        from .models import TaskSubmission
-        subs = TaskSubmission.objects.filter(assignment=obj).order_by('submitted_at')
+        subs = obj.submission_set.order_by('submitted_at')
         return [
             {
                 'id': s.id,
@@ -101,12 +100,13 @@ class TaskSubmissionSerializer(serializers.ModelSerializer):
     approved_by = UserSerializer(read_only=True)
     approval_status = serializers.CharField(read_only=True)
     submitted_at = serializers.DateTimeField(read_only=True)
+    business_date = serializers.DateField(read_only=True)
 
     class Meta:
         model = TaskSubmission
         fields = [
             'id', 'assignment_id', 'assignment', 'photo_url', 'submitted_at',
-            'approved_by', 'approval_status', 'note',
+            'business_date', 'approved_by', 'approval_status', 'note',
         ]
 
     def validate_photo_url(self, value):

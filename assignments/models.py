@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from tasks.models import Task, Shift, Zone
+from .utils import get_business_date
 
 
 class Assignment(models.Model):
@@ -37,14 +38,20 @@ class TaskSubmission(models.Model):
         ('rejected', 'Rejected'),
     ]
 
-    assignment = models.OneToOneField(Assignment, on_delete=models.CASCADE, related_name='submission')
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submission_set')
     photo_url = models.URLField()
     submitted_at = models.DateTimeField(auto_now_add=True)
+    business_date = models.DateField(editable=False)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_submissions'
     )
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='pending')
     note = models.TextField(blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.pk:  # only on creation
+            self.business_date = get_business_date()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'Submission for {self.assignment} - {self.approval_status}'
+        return f'Submission for {self.assignment} ({self.business_date}) - {self.approval_status}'
