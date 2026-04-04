@@ -4,41 +4,9 @@ import { useEffect, useState } from 'react';
 import { Assignment, Zone } from '@/types';
 import * as assignmentService from '@/services/assignments';
 import * as taskService from '@/services/tasks';
-import FloorLayout, { ZoneData, ActiveZones } from '@/components/store/FloorLayout';
+import FloorLayout, { ZoneData } from '@/components/store/FloorLayout';
 import Spinner from '@/components/ui/Spinner';
 
-// ── Zone name → floor plan grid-area key ────────────────────────────────────
-// Zones API'dan gelen zone.name bu tabloya normalize edilerek eşlenir.
-// Yönetici /manager/zones'da hangi isimle kaydettiyse buraya eklenebilir.
-const ZONE_KEY_MAP: Record<string, string> = {
-  'arka': 'arka',
-  'wc kadın': 'wck', 'kadın wc': 'wck', 'bayan wc': 'wck', 'kadin wc': 'wck', 'wc kadin': 'wck',
-  'wc erkek': 'wce', 'erkek wc': 'wce', 'bay wc': 'wce',
-  'wc önü': 'wconu', 'wcönü': 'wconu', 'wc onu': 'wconu', 'wc onü': 'wconu',
-  'orta': 'orta',
-  'giriş': 'giris', 'giris': 'giris',
-  'yan dükkan': 'yan', 'yan dukkan': 'yan', 'yan': 'yan',
-  'bar run': 'barrun', 'barrun': 'barrun',
-  'mutfak run': 'mutrun', 'mutrun': 'mutrun',
-  'kabile kafa': 'kabile', 'kabile': 'kabile',
-  'sakin salon': 'sakin', 'sakin': 'sakin',
-};
-
-function resolveZoneKey(name: string): string | null {
-  return ZONE_KEY_MAP[name.toLowerCase().trim()] ?? null;
-}
-
-// Zones API'dan gelen listeyi gridKey → label haritasına çevir
-function buildActiveZones(zones: Zone[]): ActiveZones {
-  const result: ActiveZones = {};
-  for (const z of zones) {
-    const key = resolveZoneKey(z.name);
-    if (key) result[key] = z.name;
-  }
-  return result;
-}
-
-// ── Shift name → section key ────────────────────────────────────────────────
 function resolveSectionKey(shiftName: string): 'opening' | 'shift' | 'closing' {
   const n = shiftName.toLowerCase();
   if (n.includes('sabah') || n.includes('açılış') || n.includes('acilis') || n.includes('opening')) return 'opening';
@@ -50,71 +18,42 @@ function buildZoneData(assignments: Assignment[]): ZoneData {
   const map: ZoneData = {};
   for (const a of assignments) {
     if (!a.zone) continue;
-    const key = resolveZoneKey(a.zone.name);
-    if (!key) continue;
-    if (!map[key]) map[key] = [];
-    if (!map[key].find(e => e.id === a.user.id)) {
-      map[key].push({ id: a.user.id, name: a.user.name });
+    if (!map[a.zone.id]) map[a.zone.id] = [];
+    if (!map[a.zone.id].find(e => e.id === a.user.id)) {
+      map[a.zone.id].push({ id: a.user.id, name: a.user.name });
     }
   }
   return map;
 }
 
-// ── Section config ───────────────────────────────────────────────────────────
 const SECTIONS = [
-  {
-    key: 'opening',
-    label: 'Açılış',
-    sublabel: 'Opening',
-    dot: 'bg-amber-400',
-    ring: 'ring-amber-500/20',
-    gradient: 'from-amber-500/5 to-transparent',
-    countColor: 'text-amber-500',
-  },
-  {
-    key: 'shift',
-    label: 'Vardiya',
-    sublabel: 'Shift',
-    dot: 'bg-indigo-400',
-    ring: 'ring-indigo-500/20',
-    gradient: 'from-indigo-500/5 to-transparent',
-    countColor: 'text-indigo-400',
-  },
-  {
-    key: 'closing',
-    label: 'Kapanış',
-    sublabel: 'Closing',
-    dot: 'bg-rose-400',
-    ring: 'ring-rose-500/20',
-    gradient: 'from-rose-500/5 to-transparent',
-    countColor: 'text-rose-400',
-  },
+  { key: 'opening', label: 'Açılış',  sublabel: 'Opening', dot: 'bg-amber-400', ring: 'ring-amber-500/20', countColor: 'text-amber-400' },
+  { key: 'shift',   label: 'Vardiya', sublabel: 'Shift',   dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
+  { key: 'closing', label: 'Kapanış', sublabel: 'Closing', dot: 'bg-rose-400',   ring: 'ring-rose-500/20',  countColor: 'text-rose-400'  },
 ] as const;
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 export default function StorePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [activeZones, setActiveZones] = useState<ActiveZones>({});
+  const [zones, setZones] = useState<Zone[]>([]);
   const [businessDate, setBusinessDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [all, dateInfo, zones] = await Promise.all([
+      const [all, dateInfo, zoneList] = await Promise.all([
         assignmentService.getAssignments(),
         assignmentService.getBusinessDate(),
         taskService.getZones(),
       ]);
       setBusinessDate(dateInfo.business_date);
       setAssignments(all.filter(a => a.date === dateInfo.business_date));
-      setActiveZones(buildActiveZones(zones));
+      setZones(zoneList);
       setLoading(false);
     }
     load();
   }, []);
 
-  // Group assignments into sections
   const sectionMap: Record<string, Assignment[]> = { opening: [], shift: [], closing: [] };
   for (const a of assignments) {
     const key = a.shift ? resolveSectionKey(a.shift.name) : 'shift';
@@ -134,7 +73,7 @@ export default function StorePage() {
   return (
     <div className="min-h-screen bg-slate-950 -m-6 px-4 py-6 md:px-8 md:py-8">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
         <div>
           <p className="text-slate-600 text-xs uppercase tracking-widest mb-1">Yerleşim Planı</p>
@@ -153,17 +92,16 @@ export default function StorePage() {
         </div>
       </div>
 
-      {/* ── Section tabs (mobile) ── */}
+      {/* Section tabs (mobile) */}
       <div className="flex md:hidden gap-2 mb-6 overflow-x-auto pb-1">
         {SECTIONS.map(s => (
           <button
             key={s.key}
             onClick={() => setActiveSection(activeSection === s.key ? null : s.key)}
             className={`
-              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap
-              border transition-all duration-150
+              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all duration-150
               ${activeSection === s.key || activeSection === null
-                ? `bg-slate-800 border-slate-700 text-white`
+                ? 'bg-slate-800 border-slate-700 text-white'
                 : 'bg-transparent border-slate-800 text-slate-600'}
             `}
           >
@@ -176,24 +114,20 @@ export default function StorePage() {
         ))}
       </div>
 
-      {/* ── Sections ── */}
+      {/* Sections */}
       <div className="flex flex-col gap-12">
         {SECTIONS.map((section, idx) => {
           const sectionAssignments = sectionMap[section.key];
           const zoneData = buildZoneData(sectionAssignments);
           const staffCount = new Set(sectionAssignments.map(a => a.user.id)).size;
           const isVisible = activeSection === null || activeSection === section.key;
-
           if (!isVisible) return null;
 
           return (
             <div
               key={section.key}
               className="opacity-0"
-              style={{
-                animation: 'sectionFadeIn 0.35s ease forwards',
-                animationDelay: `${idx * 80}ms`,
-              }}
+              style={{ animation: 'sectionFadeIn 0.35s ease forwards', animationDelay: `${idx * 80}ms` }}
             >
               {/* Section header */}
               <div className="flex items-center gap-3 mb-5">
@@ -209,35 +143,16 @@ export default function StorePage() {
                     {staffCount > 0 ? `${staffCount} personel aktif` : 'Personel atanmadı'}
                   </p>
                 </div>
-                {/* Divider line */}
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent hidden md:block" />
               </div>
 
               {/* Floor plan */}
               <div className="rounded-2xl p-3 md:p-5 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/60">
-                <FloorLayout data={zoneData} activeZones={activeZones} />
+                <FloorLayout zones={zones} data={zoneData} />
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* ── Legend ── */}
-      <div className="mt-12 pt-6 border-t border-slate-800/60 flex flex-wrap gap-x-6 gap-y-2">
-        {[
-          { color: 'bg-amber-400', label: 'Arka (Mutfak)' },
-          { color: 'bg-indigo-400', label: 'Orta (Ana salon)' },
-          { color: 'bg-emerald-400', label: 'Giriş' },
-          { color: 'bg-violet-400', label: 'Yan Dükkan' },
-          { color: 'bg-rose-400', label: 'Kabile Kafa' },
-          { color: 'bg-cyan-400', label: 'Sakin Salon' },
-          { color: 'bg-slate-400', label: 'WC Alanları' },
-        ].map(item => (
-          <div key={item.label} className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${item.color}`} />
-            <span className="text-slate-600 text-[10px]">{item.label}</span>
-          </div>
-        ))}
       </div>
     </div>
   );
