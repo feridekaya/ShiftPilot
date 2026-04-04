@@ -1,26 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Assignment } from '@/types';
+import { Assignment, Zone } from '@/types';
 import * as assignmentService from '@/services/assignments';
-import FloorLayout, { ZoneData } from '@/components/store/FloorLayout';
+import * as taskService from '@/services/tasks';
+import FloorLayout, { ZoneData, ActiveZones } from '@/components/store/FloorLayout';
 import Spinner from '@/components/ui/Spinner';
 
-// ── Zone name → floor plan key mapping ─────────────────────────────────────
+// ── Zone name → floor plan grid-area key ────────────────────────────────────
+// Zones API'dan gelen zone.name bu tabloya normalize edilerek eşlenir.
+// Yönetici /manager/zones'da hangi isimle kaydettiyse buraya eklenebilir.
 const ZONE_KEY_MAP: Record<string, string> = {
   'arka': 'arka',
   'wc kadın': 'wck', 'kadın wc': 'wck', 'bayan wc': 'wck', 'kadin wc': 'wck', 'wc kadin': 'wck',
   'wc erkek': 'wce', 'erkek wc': 'wce', 'bay wc': 'wce',
   'wc önü': 'wconu', 'wcönü': 'wconu', 'wc onu': 'wconu', 'wc onü': 'wconu',
   'orta': 'orta',
-  'giriş': 'giris', 'giris': 'giris', 'giris bölge': 'giris',
+  'giriş': 'giris', 'giris': 'giris',
   'yan dükkan': 'yan', 'yan dukkan': 'yan', 'yan': 'yan',
+  'bar run': 'barrun', 'barrun': 'barrun',
+  'mutfak run': 'mutrun', 'mutrun': 'mutrun',
   'kabile kafa': 'kabile', 'kabile': 'kabile',
   'sakin salon': 'sakin', 'sakin': 'sakin',
 };
 
 function resolveZoneKey(name: string): string | null {
   return ZONE_KEY_MAP[name.toLowerCase().trim()] ?? null;
+}
+
+// Zones API'dan gelen listeyi gridKey → label haritasına çevir
+function buildActiveZones(zones: Zone[]): ActiveZones {
+  const result: ActiveZones = {};
+  for (const z of zones) {
+    const key = resolveZoneKey(z.name);
+    if (key) result[key] = z.name;
+  }
+  return result;
 }
 
 // ── Shift name → section key ────────────────────────────────────────────────
@@ -79,18 +94,21 @@ const SECTIONS = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function StorePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [activeZones, setActiveZones] = useState<ActiveZones>({});
   const [businessDate, setBusinessDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [all, dateInfo] = await Promise.all([
+      const [all, dateInfo, zones] = await Promise.all([
         assignmentService.getAssignments(),
         assignmentService.getBusinessDate(),
+        taskService.getZones(),
       ]);
       setBusinessDate(dateInfo.business_date);
       setAssignments(all.filter(a => a.date === dateInfo.business_date));
+      setActiveZones(buildActiveZones(zones));
       setLoading(false);
     }
     load();
@@ -197,7 +215,7 @@ export default function StorePage() {
 
               {/* Floor plan */}
               <div className="rounded-2xl p-3 md:p-5 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/60">
-                <FloorLayout data={zoneData} />
+                <FloorLayout data={zoneData} activeZones={activeZones} />
               </div>
             </div>
           );
