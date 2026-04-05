@@ -13,7 +13,6 @@ const managerLinks = [
   { href: '/manager/staff', label: 'Personel' },
   { href: '/manager/tasks', label: 'Görevler' },
   { href: '/manager/zones', label: 'Bölgeler' },
-  { href: '/manager/shifts', label: 'Vardiyalar' },
   { href: '/manager/assignments', label: 'Atamalar' },
 ];
 
