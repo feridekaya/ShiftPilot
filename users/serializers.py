@@ -1,12 +1,6 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import User, StaffTeam
-
-
-class StaffTeamSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StaffTeam
-        fields = ['id', 'name']
+from .models import User
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -20,14 +14,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    team = StaffTeamSerializer(read_only=True)
-    team_id = serializers.PrimaryKeyRelatedField(
-        queryset=StaffTeam.objects.all(), source='team', allow_null=True, required=False
-    )
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'team', 'team_id', 'is_active', 'created_at']
+        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -45,13 +35,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    team_id = serializers.PrimaryKeyRelatedField(
-        queryset=StaffTeam.objects.all(), source='team', allow_null=True, required=False
-    )
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'team_id', 'is_active']
+        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'is_active']
         read_only_fields = ['id']
 
     def update(self, instance, validated_data):

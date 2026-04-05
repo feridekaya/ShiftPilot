@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { User, Role, Gender } from '@/types';
+import { User, Role, Gender, Assignment, ApprovalStatus } from '@/types';
 import * as userService from '@/services/users';
+import * as assignmentService from '@/services/assignments';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
 import { AxiosError } from 'axios';
 
 const emptyForm = { name: '', email: '', password: '', role: 'employee' as Role, gender: '' as Gender | '', is_active: true };
@@ -15,6 +17,12 @@ type SortField = 'name' | 'role' | 'email';
 type SortDir = 'asc' | 'desc';
 
 const roleOrder: Record<Role, number> = { manager: 0, supervisor: 1, employee: 2 };
+
+const approvalLabel: Record<ApprovalStatus, string> = {
+  pending: 'Bekliyor',
+  approved: 'Onaylandı',
+  rejected: 'Reddedildi',
+};
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -29,6 +37,11 @@ export default function UsersPage() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
+  // History modal
+  const [historyUser, setHistoryUser] = useState<User | null>(null);
+  const [history, setHistory] = useState<Assignment[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => { userService.getUsers().then(setUsers); }, []);
 
   function openCreate() {
@@ -39,6 +52,18 @@ export default function UsersPage() {
     setEditing(u);
     setForm({ name: u.name, email: u.email, password: '', role: u.role, gender: u.gender ?? '', is_active: u.is_active });
     setError(''); setIsOpen(true);
+  }
+
+  async function openHistory(u: User) {
+    setHistoryUser(u);
+    setHistory([]);
+    setHistoryLoading(true);
+    try {
+      const all = await assignmentService.getAssignments({ user_id: u.id });
+      setHistory(all);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -153,6 +178,7 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3">{u.is_active ? '✓' : '✗'}</td>
                 <td className="px-4 py-3 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => openHistory(u)}>Geçmiş</Button>
                   <Button size="sm" variant="secondary" onClick={() => openEdit(u)}>Düzenle</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDelete(u)}>Sil</Button>
                 </td>
@@ -165,6 +191,7 @@ export default function UsersPage() {
         </table>
       </div>
 
+      {/* ── Create / Edit Modal ── */}
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editing ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
@@ -196,6 +223,64 @@ export default function UsersPage() {
             <Button type="submit" isLoading={saving}>Kaydet</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── Geçmiş Modal ── */}
+      <Modal
+        isOpen={!!historyUser}
+        onClose={() => setHistoryUser(null)}
+        title={historyUser ? `${historyUser.name} — Görev Geçmişi` : ''}
+      >
+        {historyLoading ? (
+          <div className="flex justify-center py-8"><Spinner size="lg" /></div>
+        ) : history.length === 0 ? (
+          <p className="text-center text-gray-400 py-6">Henüz görev yok.</p>
+        ) : (
+          <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
+            {history.map(a => (
+              <div key={a.id} className="border rounded-lg p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium text-sm">{a.task.title}</p>
+                    <p className="text-xs text-gray-500">
+                      {a.date}
+                      {a.zone && ` · ${a.zone.name}`}
+                      {a.shift && ` · ${a.shift.name}`}
+                    </p>
+                  </div>
+                  <Badge status={a.status} />
+                </div>
+                {a.submissions && a.submissions.length > 0 && (
+                  <div className="pl-2 border-l-2 border-gray-100 flex flex-col gap-2 mt-1">
+                    {a.submissions.map((s, idx) => (
+                      <div key={s.id} className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">#{idx + 1}</span>
+                          <span className={
+                            s.approval_status === 'approved' ? 'text-green-600 font-medium' :
+                            s.approval_status === 'rejected' ? 'text-red-600 font-medium' :
+                            'text-yellow-600 font-medium'
+                          }>
+                            {approvalLabel[s.approval_status]}
+                          </span>
+                          <span className="text-gray-400">
+                            {new Date(s.submitted_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {s.approved_by && (
+                            <span className="text-gray-400">· {s.approved_by}</span>
+                          )}
+                        </div>
+                        {s.note && (
+                          <p className="mt-0.5 text-gray-500 italic pl-4">"{s.note}"</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
     </div>
   );

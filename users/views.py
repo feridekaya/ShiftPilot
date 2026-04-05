@@ -2,12 +2,11 @@ from rest_framework import generics, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import User, StaffTeam
+from .models import User
 from .permissions import IsManager
 from .serializers import (
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
-    StaffTeamSerializer,
     UserSerializer,
     UserCreateSerializer,
     UserUpdateSerializer,
@@ -23,7 +22,6 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
     def perform_create(self, serializer):
-        # Unauthenticated callers always get role='employee'
         if not self.request.user or not self.request.user.is_authenticated:
             serializer.save(role='employee')
         else:
@@ -49,10 +47,3 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ('update', 'partial_update'):
             return UserUpdateSerializer
         return UserSerializer
-
-
-class StaffTeamViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsManager]
-    queryset = StaffTeam.objects.all().order_by('name')
-    serializer_class = StaffTeamSerializer
-    http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
