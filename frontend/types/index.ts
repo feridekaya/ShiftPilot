@@ -7,7 +7,8 @@ export interface StaffTeam {
 export type Gender = 'male' | 'female';
 export type AssignmentStatus = 'pending' | 'completed' | 'approved' | 'rejected';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type Frequency = 'multiple_daily' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type Frequency = 'multiple_daily' | 'interval_daily' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type TaskCategory = 'opening' | 'closing' | 'responsibility' | 'general' | 'special';
 
 export interface User {
   id: number;
@@ -37,6 +38,7 @@ export interface TaskSchedule {
   id: number;
   frequency: Frequency;
   times_per_day: number;
+  interval_hours: number | null;
   days_of_week: number[];
   month_day: number | null;
   month: number | null;
@@ -46,6 +48,7 @@ export interface Task {
   id: number;
   title: string;
   description: string;
+  category: TaskCategory;
   zone: Zone | null;
   requires_photo: boolean;
   coefficient: number;

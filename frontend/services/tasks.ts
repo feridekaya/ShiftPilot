@@ -1,4 +1,4 @@
-import { Task, Zone, Shift, TaskSchedule } from '@/types';
+import { Task, Zone, Shift, TaskSchedule, TaskCategory } from '@/types';
 import api from './api';
 
 // Tasks
@@ -10,6 +10,7 @@ export async function getTasks(): Promise<Task[]> {
 export async function createTask(payload: {
   title: string;
   description?: string;
+  category?: TaskCategory;
   zone_id: number;
   requires_photo?: boolean;
   coefficient: number;
@@ -74,6 +75,7 @@ export interface SchedulePayload {
   task_id: number;
   frequency: string;
   times_per_day?: number;
+  interval_hours?: number | null;
   days_of_week?: number[];
   month_day?: number | null;
   month?: number | null;

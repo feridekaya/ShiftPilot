@@ -27,12 +27,12 @@ class TaskScheduleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TaskSchedule
-        fields = ['id', 'task_id', 'frequency', 'times_per_day', 'days_of_week', 'month_day', 'month']
+        fields = ['id', 'task_id', 'frequency', 'times_per_day', 'interval_hours', 'days_of_week', 'month_day', 'month']
 
     def validate(self, data):
         frequency = data.get('frequency', getattr(self.instance, 'frequency', None))
         days = data.get('days_of_week', [])
-        if frequency in ('daily', 'multiple_daily', 'monthly', 'yearly'):
+        if frequency in ('daily', 'multiple_daily', 'interval_daily', 'monthly', 'yearly'):
             data['days_of_week'] = []
         elif frequency == 'weekly':
             if not days:
@@ -63,7 +63,7 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'zone', 'zone_id',
+            'id', 'title', 'description', 'category', 'zone', 'zone_id',
             'requires_photo', 'coefficient', 'allowed_roles',
             'allowed_genders', 'created_by', 'schedule',
         ]
