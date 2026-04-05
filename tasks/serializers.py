@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Zone, Shift, Task, TaskSchedule
+from django.contrib.auth import get_user_model
+from .models import Zone, Shift, Task, TaskSchedule, WorkSchedule
+
+User = get_user_model()
 
 VALID_ROLES = ['manager', 'supervisor', 'employee']
 VALID_DAYS = list(range(7))  # 0=Monday … 6=Sunday
@@ -69,3 +72,15 @@ class TaskSerializer(serializers.ModelSerializer):
         if value < 1:
             raise serializers.ValidationError('Coefficient must be at least 1.')
         return value
+
+
+class WorkScheduleSerializer(serializers.ModelSerializer):
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='user', write_only=True
+    )
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    user_role = serializers.CharField(source='user.role', read_only=True)
+
+    class Meta:
+        model = WorkSchedule
+        fields = ['id', 'user_id', 'user_name', 'user_role', 'date', 'is_off', 'start_time', 'end_time']

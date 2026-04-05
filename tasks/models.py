@@ -53,3 +53,22 @@ class TaskSchedule(models.Model):
 
     def __str__(self):
         return f'{self.task.title} - {self.frequency}'
+
+
+class WorkSchedule(models.Model):
+    """Per-user, per-day work schedule (weekly shift planner)."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_schedules'
+    )
+    date = models.DateField()          # business date (Monday = start of week)
+    is_off = models.BooleanField(default=False)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'date')
+        ordering = ['date', 'user__name']
+
+    def __str__(self):
+        label = 'OFF' if self.is_off else f'{self.start_time}–{self.end_time}'
+        return f'{self.user} {self.date} {label}'
