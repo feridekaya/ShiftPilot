@@ -39,7 +39,9 @@ class TaskSubmission(models.Model):
     ]
 
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submission_set')
-    photo_url = models.URLField()
+    # Legacy single photo field — kept for backwards compat, new code uses SubmissionPhoto
+    photo_url = models.URLField(blank=True, default='')
+    staff_note = models.TextField(blank=True, default='')
     submitted_at = models.DateTimeField(auto_now_add=True)
     business_date = models.DateField(editable=False)
     approved_by = models.ForeignKey(
@@ -49,9 +51,21 @@ class TaskSubmission(models.Model):
     note = models.TextField(blank=True)
 
     def save(self, *args, **kwargs):
-        if not self.pk:  # only on creation
+        if not self.pk:
             self.business_date = get_business_date()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f'Submission for {self.assignment} ({self.business_date}) - {self.approval_status}'
+
+
+class SubmissionPhoto(models.Model):
+    submission = models.ForeignKey(TaskSubmission, on_delete=models.CASCADE, related_name='photos')
+    photo_url = models.URLField()
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f'Photo #{self.order} for submission {self.submission_id}'

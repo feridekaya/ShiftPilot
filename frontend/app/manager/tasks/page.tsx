@@ -303,6 +303,7 @@ export default function TasksPage() {
               >
                 Bölge {sortIcon('zone')}
               </th>
+              <th className="px-4 py-3 text-left">Açıklama</th>
               {['Katsayı', 'Fotoğraf', 'Tekrarlama', 'Roller', 'İşlemler'].map(h => (
                 <th key={h} className="px-4 py-3 text-left">{h}</th>
               ))}
@@ -318,6 +319,11 @@ export default function TasksPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{t.zone?.name ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px]">
+                  {t.description
+                    ? <span title={t.description}>{t.description.length > 80 ? t.description.slice(0, 80) + '…' : t.description}</span>
+                    : <span className="text-gray-300 italic">—</span>}
+                </td>
                 <td className="px-4 py-3">{t.coefficient}</td>
                 <td className="px-4 py-3">{t.requires_photo ? 'Evet' : 'Hayır'}</td>
                 <td className="px-4 py-3 text-gray-600 text-xs">{scheduleToLabel(t.schedule)}</td>

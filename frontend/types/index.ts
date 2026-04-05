@@ -52,12 +52,20 @@ export interface Task {
   schedule: TaskSchedule | null;
 }
 
+export interface SubmissionPhoto {
+  id: number;
+  photo_url: string;
+  order: number;
+}
+
 export interface SubmissionHistoryItem {
   id: number;
   submitted_at: string;
   approval_status: ApprovalStatus;
   note: string;
+  staff_note: string;
   photo_url: string;
+  photos: SubmissionPhoto[];
   approved_by: string | null;
 }
 
@@ -79,12 +87,16 @@ export interface TaskSubmission {
     id: number;
     user: User;
     task_title: string;
+    task_description: string;
+    task_category: TaskCategory;
     zone_name: string | null;
     shift_name: string | null;
     date: string;
     status: AssignmentStatus;
   };
   photo_url: string;
+  photos: SubmissionPhoto[];
+  staff_note: string;
   submitted_at: string;
   approved_by: User | null;
   approval_status: ApprovalStatus;
