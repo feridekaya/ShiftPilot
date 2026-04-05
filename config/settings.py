@@ -108,5 +108,10 @@ SIMPLE_JWT = {
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
+# --- Business Day ---
+# Gece bu saatten önce yapılan işlemler önceki takvim gününe atanır.
+# Örnek: 4 → 00:00–03:59 arası işlemler bir önceki güne ait sayılır.
+BUSINESS_DAY_CUTOFF_HOUR = int(os.getenv('BUSINESS_DAY_CUTOFF_HOUR', 4))
+
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

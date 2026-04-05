@@ -1,16 +1,30 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.conf import settings
 
 from users.permissions import IsManager, IsManagerOrSupervisor, IsSupervisor
 from .models import Assignment, TaskSubmission
 from .serializers import AssignmentSerializer, TaskSubmissionSerializer, SubmissionApprovalSerializer
+from .utils import get_business_date
+
+
+class BusinessDateView(GenericAPIView):
+    """Returns the current business date and cutoff hour."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            'business_date': str(get_business_date()),
+            'cutoff_hour': getattr(settings, 'BUSINESS_DAY_CUTOFF_HOUR', 4),
+        })
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = AssignmentSerializer
-    http_method_names = ['get', 'post', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
     def get_permissions(self):
         if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
@@ -56,11 +70,18 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = TaskSubmission.objects.select_related(
-            'assignment__user', 'assignment__task', 'approved_by'
+            'assignment__user', 'assignment__task', 'assignment__zone',
+            'assignment__shift', 'approved_by'
         )
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(approval_status=status_filter)
+        assignment_id = self.request.query_params.get('assignment_id')
+        if assignment_id:
+            qs = qs.filter(assignment_id=assignment_id)
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            qs = qs.filter(assignment__user_id=user_id)
         return qs.order_by('-submitted_at')
 
     def get_serializer_context(self):
@@ -98,6 +119,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         submission.approved_by = request.user
         submission.note = serializer.validated_data.get('note', submission.note)
         submission.save()
-        submission.assignment.status = 'rejected'
+        # Return task to employee as pending so they can resubmit
+        submission.assignment.status = 'pending'
         submission.assignment.save(update_fields=['status'])
         return Response(TaskSubmissionSerializer(submission, context={'request': request}).data)

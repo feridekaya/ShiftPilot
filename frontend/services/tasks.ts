@@ -40,6 +40,15 @@ export async function createZone(payload: { name: string; description?: string }
   return data;
 }
 
+export async function updateZone(id: number, payload: { name: string; description?: string }): Promise<Zone> {
+  const { data } = await api.put<Zone>(`/api/tasks/zones/${id}/`, payload);
+  return data;
+}
+
+export async function deleteZone(id: number): Promise<void> {
+  await api.delete(`/api/tasks/zones/${id}/`);
+}
+
 // Shifts
 export async function getShifts(): Promise<Shift[]> {
   const { data } = await api.get<Shift[]>('/api/tasks/shifts/');
@@ -51,17 +60,35 @@ export async function createShift(payload: { name: string; start_time: string; e
   return data;
 }
 
-// Schedules
-export async function getSchedules(): Promise<TaskSchedule[]> {
-  const { data } = await api.get<TaskSchedule[]>('/api/tasks/schedules/');
+export async function updateShift(id: number, payload: { name: string; start_time: string; end_time: string }): Promise<Shift> {
+  const { data } = await api.put<Shift>(`/api/tasks/shifts/${id}/`, payload);
   return data;
 }
 
-export async function createSchedule(payload: {
+export async function deleteShift(id: number): Promise<void> {
+  await api.delete(`/api/tasks/shifts/${id}/`);
+}
+
+// Schedules
+export interface SchedulePayload {
   task_id: number;
   frequency: string;
+  times_per_day?: number;
   days_of_week?: number[];
-}): Promise<TaskSchedule> {
+  month_day?: number | null;
+  month?: number | null;
+}
+
+export async function createSchedule(payload: SchedulePayload): Promise<TaskSchedule> {
   const { data } = await api.post<TaskSchedule>('/api/tasks/schedules/', payload);
   return data;
+}
+
+export async function updateSchedule(id: number, payload: Partial<SchedulePayload>): Promise<TaskSchedule> {
+  const { data } = await api.put<TaskSchedule>(`/api/tasks/schedules/${id}/`, payload);
+  return data;
+}
+
+export async function deleteSchedule(id: number): Promise<void> {
+  await api.delete(`/api/tasks/schedules/${id}/`);
 }

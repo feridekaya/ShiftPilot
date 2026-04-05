@@ -27,13 +27,28 @@ class AssignmentSerializer(serializers.ModelSerializer):
     )
     assigned_by = UserSerializer(read_only=True)
     status = serializers.CharField(read_only=True)
+    submissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Assignment
         fields = [
             'id', 'user', 'user_id', 'task', 'task_id',
             'shift', 'shift_id', 'zone', 'zone_id',
-            'date', 'status', 'assigned_by',
+            'date', 'status', 'assigned_by', 'submissions',
+        ]
+
+    def get_submissions(self, obj):
+        subs = obj.submission_set.order_by('submitted_at')
+        return [
+            {
+                'id': s.id,
+                'submitted_at': s.submitted_at.isoformat(),
+                'approval_status': s.approval_status,
+                'note': s.note,
+                'photo_url': s.photo_url,
+                'approved_by': s.approved_by.name if s.approved_by else None,
+            }
+            for s in subs
         ]
 
     def validate(self, data):
@@ -65,19 +80,33 @@ class AssignmentSerializer(serializers.ModelSerializer):
         return data
 
 
+class SubmissionAssignmentSerializer(serializers.ModelSerializer):
+    """Lightweight assignment info embedded in submissions."""
+    user = UserSerializer(read_only=True)
+    task_title = serializers.CharField(source='task.title', read_only=True)
+    zone_name = serializers.CharField(source='zone.name', read_only=True, default=None)
+    shift_name = serializers.CharField(source='shift.name', read_only=True, default=None)
+
+    class Meta:
+        model = Assignment
+        fields = ['id', 'user', 'task_title', 'zone_name', 'shift_name', 'date', 'status']
+
+
 class TaskSubmissionSerializer(serializers.ModelSerializer):
     assignment_id = serializers.PrimaryKeyRelatedField(
         queryset=Assignment.objects.all(), source='assignment', write_only=True
     )
+    assignment = SubmissionAssignmentSerializer(read_only=True)
     approved_by = UserSerializer(read_only=True)
     approval_status = serializers.CharField(read_only=True)
     submitted_at = serializers.DateTimeField(read_only=True)
+    business_date = serializers.DateField(read_only=True)
 
     class Meta:
         model = TaskSubmission
         fields = [
-            'id', 'assignment_id', 'photo_url', 'submitted_at',
-            'approved_by', 'approval_status', 'note',
+            'id', 'assignment_id', 'assignment', 'photo_url', 'submitted_at',
+            'business_date', 'approved_by', 'approval_status', 'note',
         ]
 
     def validate_photo_url(self, value):

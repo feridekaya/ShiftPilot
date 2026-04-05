@@ -9,9 +9,13 @@ export async function createSubmission(assignmentId: number, photoUrl: string): 
   return data;
 }
 
-export async function getSubmissions(status?: string): Promise<TaskSubmission[]> {
-  const params = status ? `?status=${status}` : '';
-  const { data } = await api.get<TaskSubmission[]>(`/api/assignments/submissions/${params}`);
+export async function getSubmissions(filters?: { status?: string; assignment_id?: number; user_id?: number }): Promise<TaskSubmission[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.assignment_id) params.set('assignment_id', String(filters.assignment_id));
+  if (filters?.user_id) params.set('user_id', String(filters.user_id));
+  const q = params.toString();
+  const { data } = await api.get<TaskSubmission[]>(`/api/assignments/submissions/${q ? '?' + q : ''}`);
   return data;
 }
 
