@@ -42,7 +42,87 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
+        date_filter = self.request.query_params.get('date')
+        if date_filter:
+            qs = qs.filter(date=date_filter)
         return qs.order_by('-date')
+
+    @action(detail=False, methods=['post'], url_path='bulk')
+    def bulk(self, request):
+        """Bulk-create assignments for a day, replacing existing pending ones."""
+        from tasks.models import Task as TaskModel
+        from users.models import User as UserModel
+
+        date_str = request.data.get('date')
+        items = request.data.get('assignments', [])
+
+        if not date_str:
+            return Response({'error': 'date is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Replace all pending assignments for this date
+        Assignment.objects.filter(date=date_str, status='pending').delete()
+
+        created_objs = []
+        errors = []
+        seen = set()  # deduplicate (user_id, task_id)
+
+        for item in items:
+            user_id = item.get('user_id')
+            task_id = item.get('task_id')
+            zone_id = item.get('zone_id')
+            key = (user_id, task_id)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            try:
+                user = UserModel.objects.get(id=user_id)
+                task = TaskModel.objects.get(id=task_id)
+            except (UserModel.DoesNotExist, TaskModel.DoesNotExist):
+                errors.append(f'Geçersiz kullanıcı ({user_id}) veya görev ({task_id}).')
+                continue
+
+            if task.allowed_genders and user.gender != task.allowed_genders:
+                gender_label = 'erkek' if task.allowed_genders == 'male' else 'kadın'
+                errors.append(f'{user.name} → {task.title}: sadece {gender_label} personel atanabilir.')
+                continue
+
+            a = Assignment.objects.create(
+                user=user,
+                task=task,
+                zone_id=zone_id or task.zone_id,
+                date=date_str,
+                assigned_by=request.user,
+            )
+            created_objs.append(a)
+
+        return Response({
+            'created': len(created_objs),
+            'errors': errors,
+            'assignments': AssignmentSerializer(created_objs, many=True, context={'request': request}).data,
+        })
+
+    @action(detail=False, methods=['get'], url_path='previous-day')
+    def previous_day(self, request):
+        """Return assignments from the most recent day before the given date."""
+        from datetime import date as date_cls, timedelta
+
+        date_str = request.query_params.get('date')
+        if not date_str:
+            return Response({'error': 'date required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            d = date_cls.fromisoformat(date_str)
+        except ValueError:
+            return Response({'error': 'invalid date'}, status=status.HTTP_400_BAD_REQUEST)
+
+        prev = d - timedelta(days=1)
+        for _ in range(7):
+            qs = Assignment.objects.filter(date=prev).select_related('user', 'task', 'zone', 'shift')
+            if qs.exists():
+                return Response(AssignmentSerializer(qs, many=True, context={'request': request}).data)
+            prev -= timedelta(days=1)
+
+        return Response([])
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
