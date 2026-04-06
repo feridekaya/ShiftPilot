@@ -66,6 +66,8 @@ function dateLabel(d: Date): string {
 // ── Types ─────────────────────────────────────────────────────────────────────
 // taskId → userId[]
 type DayPlan = Record<number, number[]>;
+// taskId → description expanded?
+type ExpandedDescs = Record<number, boolean>;
 // taskId → Set of userIds that are permanently assigned
 type PermanentPlan = Record<number, Set<number>>;
 
@@ -79,6 +81,7 @@ export default function AssignmentsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plan, setPlan] = useState<DayPlan>({});
   const [permanentPlan, setPermanentPlan] = useState<PermanentPlan>({});
+  const [expandedDescs, setExpandedDescs] = useState<ExpandedDescs>({});
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -463,7 +466,18 @@ export default function AssignmentsPage() {
                       >
                         {/* Task name + zone + coefficient */}
                         <div className="flex items-start justify-between gap-1">
-                          <p className="text-xs font-semibold text-gray-800 leading-snug">{task.title}</p>
+                          <button
+                            className="text-xs font-semibold text-gray-800 leading-snug text-left hover:text-indigo-700 transition-colors"
+                            title={task.description || undefined}
+                            onClick={() => task.description && setExpandedDescs(e => ({ ...e, [task.id]: !e[task.id] }))}
+                          >
+                            {task.title}
+                            {task.description && (
+                              <span className="ml-1 text-[9px] text-gray-400 font-normal">
+                                {expandedDescs[task.id] ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </button>
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                             {task.zone && (
                               <span className="text-[9px] text-gray-400">{task.zone.name}</span>
@@ -477,6 +491,13 @@ export default function AssignmentsPage() {
                             ) : null}
                           </div>
                         </div>
+
+                        {/* Description (expandable) */}
+                        {task.description && expandedDescs[task.id] && (
+                          <p className="text-[10px] text-gray-500 leading-relaxed bg-white/70 rounded px-1.5 py-1 -mt-1 border border-gray-200">
+                            {task.description}
+                          </p>
+                        )}
 
                         {/* Assigned badges */}
                         <div className="flex flex-wrap gap-1 flex-1">

@@ -28,7 +28,7 @@ function buildZoneData(assignments: Assignment[]): ZoneData {
 
 const SECTIONS = [
   { key: 'opening', label: 'Açılış',  sublabel: 'Opening', dot: 'bg-amber-400', ring: 'ring-amber-500/20', countColor: 'text-amber-400' },
-  { key: 'shift',   label: 'Vardiya', sublabel: 'Shift',   dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
+  { key: 'shift',   label: 'Sorumluluk Bölgesi', sublabel: 'Responsibility', dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
   { key: 'closing', label: 'Kapanış', sublabel: 'Closing', dot: 'bg-rose-400',   ring: 'ring-rose-500/20',  countColor: 'text-rose-400'  },
 ] as const;
 
