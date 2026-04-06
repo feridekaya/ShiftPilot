@@ -29,6 +29,13 @@ const CATEGORY_STYLE: Record<TaskCategory, {
 
 const CATEGORY_ORDER: TaskCategory[] = ['opening', 'closing', 'responsibility', 'general', 'special'];
 
+// ── Role icons ─────────────────────────────────────────────────────────────────
+const ROLE_ICON: Record<string, string> = {
+  manager:    '👑',
+  supervisor: '🎯',
+  employee:   '👤',
+};
+
 // ── Schedule check ─────────────────────────────────────────────────────────────
 // Returns true if the task's schedule says it should recur on this date.
 // 0=Mon … 6=Sun (matching backend days_of_week encoding)
@@ -394,7 +401,7 @@ export default function AssignmentsPage() {
 
         {/* ── Staff Pool ── */}
         <div
-          className="w-40 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          className="w-48 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
           onDragOver={e => e.preventDefault()}
           onDrop={onPoolDrop}
         >
@@ -412,15 +419,18 @@ export default function AssignmentsPage() {
                   onDragStart={e => onDragStart(e, u.id, null)}
                   onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
                   className={`
-                    px-2.5 py-1.5 rounded-lg cursor-grab active:cursor-grabbing select-none
+                    px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
                     border text-xs font-medium transition-all
                     ${assigned
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                       : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}
                   `}
                 >
-                  <div className="truncate">{u.name}</div>
-                  {assigned && <div className="text-[9px] text-indigo-400 mt-0.5">atanmış ✓</div>}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
+                    <span className="truncate">{u.name}</span>
+                  </div>
+                  {assigned && <div className="text-[9px] text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
                 </div>
               );
             })}
@@ -515,12 +525,13 @@ export default function AssignmentsPage() {
                                   draggable
                                   onDragStart={e => onDragStart(e, u.id, task.id)}
                                   onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
-                                  className={`inline-flex items-center gap-0.5 text-[11px] rounded-full pl-2 pr-1 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
+                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full pl-1.5 pr-1 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
                                     ${isLocked
                                       ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                                       : 'bg-white border-gray-200 text-gray-700'}`}
                                 >
-                                  {u.name.split(' ')[0]}
+                                  <span className="leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
+                                  {u.name}
                                   {/* Lock toggle — only shown if task has a schedule */}
                                   {hasSchedule && (
                                     <button
