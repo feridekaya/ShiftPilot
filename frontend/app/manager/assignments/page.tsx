@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { User, Task, TaskCategory } from '@/types';
+import { User, Task, TaskCategory, TaskSchedule } from '@/types';
 import * as userService from '@/services/users';
 import * as taskService from '@/services/tasks';
 import * as assignmentService from '@/services/assignments';
@@ -28,6 +28,29 @@ const CATEGORY_STYLE: Record<TaskCategory, {
 };
 
 const CATEGORY_ORDER: TaskCategory[] = ['opening', 'closing', 'responsibility', 'general', 'special'];
+
+// ── Schedule check ─────────────────────────────────────────────────────────────
+// Returns true if the task's schedule says it should recur on this date.
+// 0=Mon … 6=Sun (matching backend days_of_week encoding)
+function scheduleAppliesToDate(schedule: TaskSchedule | null, d: Date): boolean {
+  if (!schedule) return false;
+  const jsDay  = d.getDay(); // 0=Sun … 6=Sat
+  const trDay  = jsDay === 0 ? 6 : jsDay - 1; // convert to 0=Mon … 6=Sun
+  switch (schedule.frequency) {
+    case 'daily':
+    case 'multiple_daily':
+    case 'interval_daily':
+      return true;
+    case 'weekly':
+      return (schedule.days_of_week ?? []).includes(trDay);
+    case 'monthly':
+      return d.getDate() === schedule.month_day;
+    case 'yearly':
+      return d.getDate() === schedule.month_day && (d.getMonth() + 1) === schedule.month;
+    default:
+      return false;
+  }
+}
 
 // ── Date utils ─────────────────────────────────────────────────────────────────
 const TR_MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
@@ -83,7 +106,7 @@ export default function AssignmentsPage() {
     if (loading) return;
     setPlanLoading(true);
     assignmentService.getAssignments({ date: toISO(date) }).then(assignments => {
-      // Build permanent plan from task definitions (always available)
+      // permanent plan always reflects the task's permanent_assignees definition
       const permPlan: PermanentPlan = {};
       for (const t of tasks) {
         if (t.permanent_assignees.length > 0) {
@@ -94,20 +117,21 @@ export default function AssignmentsPage() {
 
       const newPlan: DayPlan = {};
       if (assignments.length > 0) {
-        // Use actual saved assignments
+        // Real saved assignments exist for this date — use them
         for (const a of assignments) {
           if (!newPlan[a.task.id]) newPlan[a.task.id] = [];
           if (!newPlan[a.task.id].includes(a.user.id)) newPlan[a.task.id].push(a.user.id);
         }
         setDirty(false);
       } else {
-        // No saved assignments — pre-populate from permanent assignees
+        // No saved assignments — pre-populate from permanent_assignees
+        // but only if the task's schedule says it recurs on this date
         for (const t of tasks) {
-          if (t.permanent_assignees.length > 0) {
+          if (t.permanent_assignees.length > 0 && scheduleAppliesToDate(t.schedule, date)) {
             newPlan[t.id] = t.permanent_assignees.map(u => u.id);
           }
         }
-        setDirty(Object.keys(newPlan).length > 0); // dirty only if there's something to save
+        setDirty(Object.keys(newPlan).length > 0);
       }
       setPlan(newPlan);
       setPlanLoading(false);
@@ -175,6 +199,49 @@ export default function AssignmentsPage() {
       [taskId]: [...new Set([...(p[taskId] ?? []), ...eligible.map(u => u.id)])],
     }));
     setDirty(true);
+  }
+
+  // ── Toggle lock (permanent assignee) ────────────────────────────────────────
+  async function toggleLock(userId: number, taskId: number) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const currentIds = task.permanent_assignees.map(u => u.id);
+    const isLocked = currentIds.includes(userId);
+    const newIds = isLocked
+      ? currentIds.filter(id => id !== userId)
+      : [...currentIds, userId];
+
+    // Optimistic local update
+    setPermanentPlan(p => {
+      const next = { ...p };
+      if (!next[taskId]) next[taskId] = new Set();
+      else next[taskId] = new Set(next[taskId]);
+      if (isLocked) next[taskId].delete(userId);
+      else next[taskId].add(userId);
+      return next;
+    });
+
+    // Persist to backend
+    try {
+      const updated = await taskService.setPermanentAssignees(taskId, newIds);
+      // Sync tasks list so schedule-aware logic stays accurate
+      setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+      const user = employees.find(u => u.id === userId);
+      toast(
+        isLocked
+          ? `${user?.name ?? 'Personel'} kilidi kaldırıldı.`
+          : `${user?.name ?? 'Personel'} bu görev için sabit atandı 🔒`,
+        'ok'
+      );
+    } catch {
+      // Revert
+      setPermanentPlan(p => {
+        const next = { ...p };
+        next[taskId] = new Set(currentIds);
+        return next;
+      });
+      toast('Kilit kaydedilemedi.', 'error');
+    }
   }
 
   // ── Copy previous day ───────────────────────────────────────────────────────
@@ -292,6 +359,13 @@ export default function AssignmentsPage() {
             {dirty ? 'Kaydet ●' : 'Kaydet'}
           </Button>
         </div>
+      </div>
+
+      {/* ── Legend ── */}
+      <div className="flex items-center gap-4 text-xs text-gray-400 -mt-1">
+        <span>🔓 kilitle → <span className="text-indigo-600 font-medium">🔒 sabit atama</span> (görevin tekrar gününde otomatik gelir)</span>
+        <span className="text-gray-300">|</span>
+        <span>Kilit sadece tekrarlayan görevlerde görünür</span>
       </div>
 
       {/* ── Toasts ── */}
@@ -412,20 +486,31 @@ export default function AssignmentsPage() {
                             </span>
                           ) : (
                             assigned.map(u => {
-                              const isPermanent = permanentPlan[task.id]?.has(u.id) ?? false;
+                              const isLocked = permanentPlan[task.id]?.has(u.id) ?? false;
+                              const hasSchedule = !!task.schedule;
                               return (
                                 <span
                                   key={u.id}
                                   draggable
                                   onDragStart={e => onDragStart(e, u.id, task.id)}
                                   onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
-                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
-                                    ${isPermanent
+                                  className={`inline-flex items-center gap-0.5 text-[11px] rounded-full pl-2 pr-1 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
+                                    ${isLocked
                                       ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                                       : 'bg-white border-gray-200 text-gray-700'}`}
                                 >
-                                  {isPermanent && <span className="text-[9px]">📌</span>}
                                   {u.name.split(' ')[0]}
+                                  {/* Lock toggle — only shown if task has a schedule */}
+                                  {hasSchedule && (
+                                    <button
+                                      title={isLocked ? 'Kilidi kaldır' : 'Sabit ata (tekrar günlerinde otomatik gelir)'}
+                                      onMouseDown={e => e.stopPropagation()}
+                                      onClick={() => toggleLock(u.id, task.id)}
+                                      className="ml-0.5 text-[11px] hover:scale-110 transition-transform leading-none"
+                                    >
+                                      {isLocked ? '🔒' : '🔓'}
+                                    </button>
+                                  )}
                                   <button
                                     onMouseDown={e => e.stopPropagation()}
                                     onClick={() => removeFromTask(u.id, task.id)}

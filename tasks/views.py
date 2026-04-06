@@ -33,13 +33,24 @@ class ShiftViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
 
 class TaskViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     serializer_class = TaskSerializer
-    http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         return Task.objects.select_related('zone', 'created_by').prefetch_related('permanent_assignees').all()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['patch'], url_path='set-permanent-assignees',
+            permission_classes=[IsAuthenticated, IsManager])
+    def set_permanent_assignees(self, request, pk=None):
+        """Set (replace) the full list of permanent assignees for a task."""
+        from users.models import User as UserModel
+        task = self.get_object()
+        user_ids = request.data.get('user_ids', [])
+        users = UserModel.objects.filter(id__in=user_ids)
+        task.permanent_assignees.set(users)
+        return Response(TaskSerializer(task, context={'request': request}).data)
 
 
 class TaskScheduleViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):

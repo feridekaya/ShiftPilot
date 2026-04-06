@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Task, Zone, Role, TaskSchedule, Frequency, TaskCategory, User } from '@/types';
+import { Task, Zone, Role, TaskSchedule, Frequency, TaskCategory } from '@/types';
 import * as taskService from '@/services/tasks';
-import * as userService from '@/services/users';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
@@ -59,7 +58,6 @@ const emptyForm = {
   coefficient: 1,
   allowed_roles: ['employee'] as Role[],
   allowed_genders: '',
-  permanent_assignee_ids: [] as number[],
 };
 
 type ScheduleForm = {
@@ -98,7 +96,6 @@ function scheduleToLabel(s: TaskSchedule | null): string {
 export default function TasksPage() {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [zones, setZones]           = useState<Zone[]>([]);
-  const [allUsers, setAllUsers]     = useState<User[]>([]);
   const [isOpen, setIsOpen]         = useState(false);
   const [editing, setEditing]       = useState<Task | null>(null);
   const [form, setForm]             = useState(emptyForm);
@@ -115,7 +112,6 @@ export default function TasksPage() {
   useEffect(() => {
     taskService.getTasks().then(setTasks);
     taskService.getZones().then(setZones);
-    userService.getUsers().then(u => setAllUsers(u.filter(x => x.is_active)));
   }, []);
 
   const displayed = useMemo(() => {
@@ -167,7 +163,6 @@ export default function TasksPage() {
       coefficient: t.coefficient,
       allowed_roles: t.allowed_roles,
       allowed_genders: t.allowed_genders ?? '',
-      permanent_assignee_ids: t.permanent_assignees.map(u => u.id),
     });
     if (t.schedule) {
       setScheduleForm({
@@ -230,11 +225,7 @@ export default function TasksPage() {
     setError('');
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        allowed_genders: form.allowed_genders || undefined,
-        permanent_assignee_ids: form.permanent_assignee_ids,
-      };
+      const payload = { ...form, allowed_genders: form.allowed_genders || undefined };
       if (editing) {
         const updated = await taskService.updateTask(editing.id, payload);
         await saveSchedule(updated.id, editing.schedule);
@@ -313,7 +304,7 @@ export default function TasksPage() {
                 Bölge {sortIcon('zone')}
               </th>
               <th className="px-4 py-3 text-left">Açıklama</th>
-              {['Katsayı', 'Fotoğraf', 'Tekrarlama', 'Sabit Atamalar', 'Roller', 'İşlemler'].map(h => (
+              {['Katsayı', 'Fotoğraf', 'Tekrarlama', 'Roller', 'İşlemler'].map(h => (
                 <th key={h} className="px-4 py-3 text-left">{h}</th>
               ))}
             </tr>
@@ -336,17 +327,6 @@ export default function TasksPage() {
                 <td className="px-4 py-3">{t.coefficient}</td>
                 <td className="px-4 py-3">{t.requires_photo ? 'Evet' : 'Hayır'}</td>
                 <td className="px-4 py-3 text-gray-600 text-xs">{scheduleToLabel(t.schedule)}</td>
-                <td className="px-4 py-3">
-                  {t.permanent_assignees.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {t.permanent_assignees.map(u => (
-                        <span key={u.id} className="inline-flex items-center gap-1 text-[11px] bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full px-2 py-0.5 font-medium">
-                          📌 {u.name.split(' ')[0]}
-                        </span>
-                      ))}
-                    </div>
-                  ) : <span className="text-gray-300 text-xs">—</span>}
-                </td>
                 <td className="px-4 py-3 text-gray-600">{t.allowed_roles.map(r => roleLabel[r]).join(', ')}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>Düzenle</Button>
@@ -435,41 +415,6 @@ export default function TasksPage() {
             <input type="checkbox" checked={form.requires_photo} onChange={e => setForm({ ...form, requires_photo: e.target.checked })} />
             Fotoğraf zorunlu
           </label>
-
-          {/* ── Permanent Assignees ── */}
-          <div className="border-t pt-3">
-            <label className="text-sm font-medium text-gray-700 block mb-2">
-              📌 Sabit Atama
-              <span className="ml-1 text-xs font-normal text-gray-400">(her gün otomatik atanır)</span>
-            </label>
-            <div className="max-h-36 overflow-y-auto flex flex-col gap-1 border border-gray-200 rounded-lg p-2 bg-gray-50">
-              {allUsers.filter(u => !form.allowed_genders || u.gender === form.allowed_genders).map(u => (
-                <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white rounded px-1 py-0.5">
-                  <input
-                    type="checkbox"
-                    checked={form.permanent_assignee_ids.includes(u.id)}
-                    onChange={() => setForm(f => ({
-                      ...f,
-                      permanent_assignee_ids: f.permanent_assignee_ids.includes(u.id)
-                        ? f.permanent_assignee_ids.filter(id => id !== u.id)
-                        : [...f.permanent_assignee_ids, u.id],
-                    }))}
-                  />
-                  <span className="flex-1">{u.name}</span>
-                  <span className="text-xs text-gray-400">{roleLabel[u.role as Role]}</span>
-                </label>
-              ))}
-              {allUsers.length === 0 && <p className="text-xs text-gray-400 text-center py-2">Kullanıcı yükleniyor...</p>}
-            </div>
-            {form.permanent_assignee_ids.length > 0 && (
-              <p className="text-xs text-indigo-600 mt-1">
-                {form.permanent_assignee_ids.length} kişi sabit olarak atanacak
-                {form.coefficient > 1 && form.permanent_assignee_ids.length > 1
-                  ? ` · kişi başı katsayı: ${(form.coefficient / form.permanent_assignee_ids.length).toFixed(2)}`
-                  : ''}
-              </p>
-            )}
-          </div>
 
           {/* ── Schedule ── */}
           <div className="border-t pt-3">

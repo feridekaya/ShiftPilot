@@ -95,3 +95,8 @@ export async function updateSchedule(id: number, payload: Partial<SchedulePayloa
 export async function deleteSchedule(id: number): Promise<void> {
   await api.delete(`/api/tasks/schedules/${id}/`);
 }
+
+export async function setPermanentAssignees(taskId: number, userIds: number[]): Promise<Task> {
+  const { data } = await api.patch<Task>(`/api/tasks/${taskId}/set-permanent-assignees/`, { user_ids: userIds });
+  return data;
+}
