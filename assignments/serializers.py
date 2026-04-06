@@ -33,6 +33,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     )
     assigned_by = UserSerializer(read_only=True)
     status = serializers.CharField(read_only=True)
+    coefficient_share = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
     submissions = serializers.SerializerMethodField()
 
     class Meta:
@@ -40,7 +41,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_id', 'task', 'task_id',
             'shift', 'shift_id', 'zone', 'zone_id',
-            'date', 'status', 'assigned_by', 'submissions',
+            'date', 'status', 'coefficient_share', 'assigned_by', 'submissions',
         ]
 
     def get_submissions(self, obj):

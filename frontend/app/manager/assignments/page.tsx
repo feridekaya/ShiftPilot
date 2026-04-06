@@ -43,6 +43,8 @@ function dateLabel(d: Date): string {
 // ── Types ─────────────────────────────────────────────────────────────────────
 // taskId → userId[]
 type DayPlan = Record<number, number[]>;
+// taskId → Set of userIds that are permanently assigned
+type PermanentPlan = Record<number, Set<number>>;
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 interface Toast { id: number; msg: string; type: 'warn' | 'error' | 'ok' }
@@ -53,6 +55,7 @@ export default function AssignmentsPage() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plan, setPlan] = useState<DayPlan>({});
+  const [permanentPlan, setPermanentPlan] = useState<PermanentPlan>({});
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,16 +83,36 @@ export default function AssignmentsPage() {
     if (loading) return;
     setPlanLoading(true);
     assignmentService.getAssignments({ date: toISO(date) }).then(assignments => {
+      // Build permanent plan from task definitions (always available)
+      const permPlan: PermanentPlan = {};
+      for (const t of tasks) {
+        if (t.permanent_assignees.length > 0) {
+          permPlan[t.id] = new Set(t.permanent_assignees.map(u => u.id));
+        }
+      }
+      setPermanentPlan(permPlan);
+
       const newPlan: DayPlan = {};
-      for (const a of assignments) {
-        if (!newPlan[a.task.id]) newPlan[a.task.id] = [];
-        if (!newPlan[a.task.id].includes(a.user.id)) newPlan[a.task.id].push(a.user.id);
+      if (assignments.length > 0) {
+        // Use actual saved assignments
+        for (const a of assignments) {
+          if (!newPlan[a.task.id]) newPlan[a.task.id] = [];
+          if (!newPlan[a.task.id].includes(a.user.id)) newPlan[a.task.id].push(a.user.id);
+        }
+        setDirty(false);
+      } else {
+        // No saved assignments — pre-populate from permanent assignees
+        for (const t of tasks) {
+          if (t.permanent_assignees.length > 0) {
+            newPlan[t.id] = t.permanent_assignees.map(u => u.id);
+          }
+        }
+        setDirty(Object.keys(newPlan).length > 0); // dirty only if there's something to save
       }
       setPlan(newPlan);
-      setDirty(false);
       setPlanLoading(false);
     });
-  }, [date, loading]);
+  }, [date, loading, tasks]);
 
   // ── Toast helper ────────────────────────────────────────────────────────────
   function toast(msg: string, type: Toast['type'] = 'warn') {
@@ -349,6 +372,10 @@ export default function AssignmentsPage() {
                   {catTasks.map(task => {
                     const assigned = getAssigned(task.id);
                     const isOver = dragOverId === task.id;
+                    const assigneeCount = assigned.length;
+                    const coeffShare = assigneeCount > 1
+                      ? (task.coefficient / assigneeCount).toFixed(2)
+                      : null;
                     return (
                       <div
                         key={task.id}
@@ -360,12 +387,21 @@ export default function AssignmentsPage() {
                         onDragLeave={() => setDragOverId(null)}
                         onDrop={e => onTaskDrop(e, task.id)}
                       >
-                        {/* Task name + zone */}
+                        {/* Task name + zone + coefficient */}
                         <div className="flex items-start justify-between gap-1">
                           <p className="text-xs font-semibold text-gray-800 leading-snug">{task.title}</p>
-                          {task.zone && (
-                            <span className="text-[9px] text-gray-400 flex-shrink-0 mt-0.5">{task.zone.name}</span>
-                          )}
+                          <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                            {task.zone && (
+                              <span className="text-[9px] text-gray-400">{task.zone.name}</span>
+                            )}
+                            {coeffShare ? (
+                              <span className="text-[9px] text-indigo-500 font-medium">
+                                k:{coeffShare}×{assigneeCount}
+                              </span>
+                            ) : task.coefficient > 1 ? (
+                              <span className="text-[9px] text-gray-400">k:{task.coefficient}</span>
+                            ) : null}
+                          </div>
                         </div>
 
                         {/* Assigned badges */}
@@ -375,24 +411,31 @@ export default function AssignmentsPage() {
                               {isOver ? 'Bırak ↓' : 'Sürükle...'}
                             </span>
                           ) : (
-                            assigned.map(u => (
-                              <span
-                                key={u.id}
-                                draggable
-                                onDragStart={e => onDragStart(e, u.id, task.id)}
-                                onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
-                                className="inline-flex items-center gap-1 text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 font-medium text-gray-700 shadow-sm cursor-grab active:cursor-grabbing"
-                              >
-                                {u.name.split(' ')[0]}
-                                <button
-                                  onMouseDown={e => e.stopPropagation()}
-                                  onClick={() => removeFromTask(u.id, task.id)}
-                                  className="text-gray-300 hover:text-red-500 transition-colors leading-none ml-0.5"
+                            assigned.map(u => {
+                              const isPermanent = permanentPlan[task.id]?.has(u.id) ?? false;
+                              return (
+                                <span
+                                  key={u.id}
+                                  draggable
+                                  onDragStart={e => onDragStart(e, u.id, task.id)}
+                                  onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
+                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
+                                    ${isPermanent
+                                      ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                                      : 'bg-white border-gray-200 text-gray-700'}`}
                                 >
-                                  ×
-                                </button>
-                              </span>
-                            ))
+                                  {isPermanent && <span className="text-[9px]">📌</span>}
+                                  {u.name.split(' ')[0]}
+                                  <button
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onClick={() => removeFromTask(u.id, task.id)}
+                                    className="text-gray-300 hover:text-red-500 transition-colors leading-none ml-0.5"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              );
+                            })
                           )}
                         </div>
 

@@ -39,6 +39,9 @@ class Task(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_tasks'
     )
+    permanent_assignees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name='permanent_tasks'
+    )
 
     def __str__(self):
         return self.title

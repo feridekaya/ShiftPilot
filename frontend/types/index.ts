@@ -50,6 +50,7 @@ export interface Task {
   allowed_genders: Gender | null;
   created_by: string;
   schedule: TaskSchedule | null;
+  permanent_assignees: { id: number; name: string; role: Role; gender: Gender | null }[];
 }
 
 export interface SubmissionPhoto {
@@ -77,6 +78,7 @@ export interface Assignment {
   zone: Zone | null;
   date: string;
   status: AssignmentStatus;
+  coefficient_share: number | null;
   assigned_by: User | null;
   submissions: SubmissionHistoryItem[];
 }

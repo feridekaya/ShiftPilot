@@ -20,6 +20,7 @@ class Assignment(models.Model):
     zone = models.ForeignKey(Zone, on_delete=models.SET_NULL, null=True, related_name='assignments')
     date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    coefficient_share = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='assigned_tasks'
     )

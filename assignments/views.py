@@ -62,9 +62,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         # Replace all pending assignments for this date
         Assignment.objects.filter(date=date_str, status='pending').delete()
 
-        created_objs = []
+        # Pre-validate and deduplicate; count assignees per task for coefficient splitting
+        seen = set()
+        valid_items = []
         errors = []
-        seen = set()  # deduplicate (user_id, task_id)
 
         for item in items:
             user_id = item.get('user_id')
@@ -74,24 +75,33 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             if key in seen:
                 continue
             seen.add(key)
-
             try:
                 user = UserModel.objects.get(id=user_id)
                 task = TaskModel.objects.get(id=task_id)
             except (UserModel.DoesNotExist, TaskModel.DoesNotExist):
                 errors.append(f'Geçersiz kullanıcı ({user_id}) veya görev ({task_id}).')
                 continue
-
             if task.allowed_genders and user.gender != task.allowed_genders:
                 gender_label = 'erkek' if task.allowed_genders == 'male' else 'kadın'
                 errors.append(f'{user.name} → {task.title}: sadece {gender_label} personel atanabilir.')
                 continue
+            valid_items.append({'user': user, 'task': task, 'zone_id': zone_id})
 
+        # Count how many people share each task (for coefficient splitting)
+        from collections import Counter
+        task_counts = Counter(vi['task'].id for vi in valid_items)
+
+        created_objs = []
+        for vi in valid_items:
+            task = vi['task']
+            count = task_counts[task.id]
+            coeff_share = round(task.coefficient / count, 2)
             a = Assignment.objects.create(
-                user=user,
+                user=vi['user'],
                 task=task,
-                zone_id=zone_id or task.zone_id,
+                zone_id=vi['zone_id'] or task.zone_id,
                 date=date_str,
+                coefficient_share=coeff_share,
                 assigned_by=request.user,
             )
             created_objs.append(a)

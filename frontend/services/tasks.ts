@@ -16,6 +16,7 @@ export async function createTask(payload: {
   coefficient: number;
   allowed_roles: string[];
   allowed_genders?: string;
+  permanent_assignee_ids?: number[];
 }): Promise<Task> {
   const { data } = await api.post<Task>('/api/tasks/', payload);
   return data;

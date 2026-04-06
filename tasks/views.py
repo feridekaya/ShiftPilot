@@ -36,7 +36,7 @@ class TaskViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
 
     def get_queryset(self):
-        return Task.objects.select_related('zone', 'created_by').all()
+        return Task.objects.select_related('zone', 'created_by').prefetch_related('permanent_assignees').all()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
