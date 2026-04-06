@@ -70,6 +70,7 @@ export default function UsersPage() {
     e.preventDefault(); setError(''); setSaving(true);
     try {
       const payload = { ...form, gender: form.gender || undefined };
+      if (!payload.password) delete (payload as Partial<typeof payload>).password;
       if (editing) {
         const updated = await userService.updateUser(editing.id, payload);
         setUsers(users.map(u => u.id === updated.id ? updated : u));
