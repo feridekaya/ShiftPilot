@@ -205,6 +205,28 @@ export default function SchedulePage() {
     setDirty(true);
   }
 
+  async function copyPreviousWeek() {
+    const prevMonday = getMonday(addDays(monday, -7));
+    const prevSchedules = await scheduleService.getWeekSchedules(toISO(prevMonday));
+    if (!prevSchedules.length) return;
+
+    const map: typeof cells = {};
+    for (const s of prevSchedules) {
+      // Shift date forward by 7 days to map onto current week
+      const prevDate = new Date(s.date + 'T12:00:00');
+      const thisDate = toISO(addDays(prevDate, 7));
+      const user = users.find(u => u.id === s.user_id);
+      if (!user) continue;
+      map[cellKey(s.user_id, thisDate)] = {
+        is_off: s.is_off,
+        start_time: s.start_time?.slice(0, 5) ?? '',
+        end_time: s.end_time?.slice(0, 5) ?? '',
+      };
+    }
+    setCells(prev => ({ ...prev, ...map }));
+    setDirty(true);
+  }
+
   async function handleSave() {
     setSaving(true);
     const payload: scheduleService.WorkScheduleEntry[] = [];
@@ -242,6 +264,7 @@ export default function SchedulePage() {
           <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, -7)))}>← Önceki</Button>
           <Button variant="secondary" size="sm" onClick={() => setMonday(getMonday(new Date()))}>Bu Hafta</Button>
           <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, 7)))}>Sonraki →</Button>
+          <Button variant="secondary" size="sm" onClick={copyPreviousWeek}>↩ Geçen Haftayı Getir</Button>
           <Button size="sm" isLoading={saving} onClick={handleSave}>
             {dirty ? 'Kaydet ●' : 'Kaydet'}
           </Button>
