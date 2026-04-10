@@ -5,7 +5,7 @@ from tasks.models import Task, Shift, Zone
 from tasks.serializers import TaskSerializer, ShiftSerializer, ZoneSerializer
 from users.models import User
 from users.serializers import UserSerializer
-from .models import Assignment, TaskSubmission, SubmissionPhoto
+from .models import Assignment, TaskSubmission, SubmissionPhoto, RejectionLog
 
 
 class SubmissionPhotoSerializer(serializers.ModelSerializer):
@@ -125,15 +125,17 @@ class TaskSubmissionSerializer(serializers.ModelSerializer):
             'id', 'assignment_id', 'assignment',
             'photo_url', 'photo_urls', 'photos',
             'staff_note', 'submitted_at',
-            'business_date', 'approved_by', 'approval_status', 'note',
+            'business_date', 'approved_by', 'approval_status', 'note', 'rating',
         ]
 
     def validate(self, data):
         request = self.context.get('request')
         assignment = data.get('assignment')
         photo_urls = data.get('photo_urls', [])
-        if not photo_urls and not data.get('photo_url', ''):
-            raise serializers.ValidationError({'photo_urls': 'En az bir fotoğraf gerekli.'})
+        # Only require a photo when the task explicitly requires one
+        requires_photo = assignment.task.requires_photo if assignment else False
+        if requires_photo and not photo_urls and not data.get('photo_url', ''):
+            raise serializers.ValidationError({'photo_urls': 'Bu görev için fotoğraf zorunludur.'})
         if request and assignment and request.user.role == 'employee':
             if assignment.user != request.user:
                 raise serializers.ValidationError('You can only submit for your own assignments.')
@@ -150,7 +152,43 @@ class TaskSubmissionSerializer(serializers.ModelSerializer):
         return submission
 
 
-class SubmissionApprovalSerializer(serializers.ModelSerializer):
+class AuditEntrySerializer(serializers.ModelSerializer):
+    """Flat serializer for audit log entries — one row per approved/rejected submission."""
+    employee_name = serializers.CharField(source='assignment.user.name', read_only=True)
+    employee_id = serializers.IntegerField(source='assignment.user_id', read_only=True)
+    task_title = serializers.CharField(source='assignment.task.title', read_only=True)
+    task_id = serializers.IntegerField(source='assignment.task_id', read_only=True)
+    zone_name = serializers.CharField(source='assignment.zone.name', read_only=True, default=None)
+    assignment_date = serializers.DateField(source='assignment.date', read_only=True)
+    supervisor_name = serializers.CharField(source='approved_by.name', read_only=True, default=None)
+    supervisor_id = serializers.IntegerField(source='approved_by_id', read_only=True, default=None)
+
     class Meta:
         model = TaskSubmission
-        fields = ['note']
+        fields = [
+            'id', 'assignment_date', 'submitted_at',
+            'employee_id', 'employee_name',
+            'task_id', 'task_title', 'zone_name',
+            'approval_status', 'supervisor_id', 'supervisor_name',
+            'rating', 'note',
+        ]
+
+
+class RejectionLogSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='assignment.user.name', read_only=True)
+    task_title = serializers.CharField(source='assignment.task.title', read_only=True)
+    supervisor_name = serializers.CharField(source='rejected_by.name', read_only=True, default=None)
+    supervisor_id = serializers.IntegerField(source='rejected_by_id', read_only=True, default=None)
+    assignment_date = serializers.DateField(source='assignment.date', read_only=True)
+
+    class Meta:
+        model = RejectionLog
+        fields = ['id', 'rejected_at', 'assignment_date', 'employee_name', 'task_title', 'supervisor_name', 'supervisor_id', 'note']
+
+
+class SubmissionApprovalSerializer(serializers.ModelSerializer):
+    rating = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=5)
+
+    class Meta:
+        model = TaskSubmission
+        fields = ['note', 'rating']

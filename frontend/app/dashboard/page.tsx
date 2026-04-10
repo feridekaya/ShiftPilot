@@ -14,7 +14,7 @@ export default function DashboardPage() {
       router.replace('/login');
       return;
     }
-    if (user.role === 'manager') router.replace('/manager/users');
+    if (user.role === 'manager') router.replace('/manager/store');
     else if (user.role === 'supervisor') router.replace('/supervisor');
     else router.replace('/employee');
   }, [user, isLoading, router]);

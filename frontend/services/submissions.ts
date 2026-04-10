@@ -24,10 +24,10 @@ export async function getSubmissions(filters?: { status?: string; assignment_id?
   return data;
 }
 
-export async function approveSubmission(id: number, note?: string): Promise<TaskSubmission> {
+export async function approveSubmission(id: number, note?: string, rating?: number): Promise<TaskSubmission> {
   const { data } = await api.put<TaskSubmission>(
     `/api/assignments/submissions/${id}/approve/`,
-    { note: note || '' }
+    { note: note || '', ...(rating ? { rating } : {}) }
   );
   return data;
 }

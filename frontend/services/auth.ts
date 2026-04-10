@@ -26,7 +26,14 @@ export async function getMe(): Promise<AuthUser> {
   return data;
 }
 
-export function logout(): void {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
+export async function logout(): Promise<void> {
+  try {
+    // Tell the backend to close any active break before the token is gone
+    await api.post('/api/auth/logout');
+  } catch {
+    // Ignore errors — token may already be invalid; proceed with local cleanup
+  } finally {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  }
 }

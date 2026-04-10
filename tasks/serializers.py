@@ -102,7 +102,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
 class WorkScheduleSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='user', write_only=True
+        queryset=User.objects.all(), source='user'  # read+write: GET'te integer ID, POST'ta user set eder
     )
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_role = serializers.CharField(source='user.role', read_only=True)

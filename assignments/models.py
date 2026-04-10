@@ -50,6 +50,7 @@ class TaskSubmission(models.Model):
     )
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='pending')
     note = models.TextField(blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5 stars, set on approve
 
     def save(self, *args, **kwargs):
         if not self.pk:
@@ -58,6 +59,23 @@ class TaskSubmission(models.Model):
 
     def __str__(self):
         return f'Submission for {self.assignment} ({self.business_date}) - {self.approval_status}'
+
+
+class RejectionLog(models.Model):
+    """One record per rejection action — immutable audit trail."""
+    submission = models.ForeignKey(TaskSubmission, on_delete=models.CASCADE, related_name='rejection_logs')
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='rejection_logs')
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='rejections_made'
+    )
+    rejected_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-rejected_at']
+
+    def __str__(self):
+        return f'Rejection of {self.assignment} by {self.rejected_by} at {self.rejected_at}'
 
 
 class SubmissionPhoto(models.Model):

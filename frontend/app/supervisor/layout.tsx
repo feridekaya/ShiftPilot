@@ -7,7 +7,13 @@ import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
 const supervisorLinks = [
-  { href: '/supervisor', label: 'Onay Bekleyenler' },
+  { href: '/supervisor',             label: 'Onay Bekleyenler' },
+  { href: '/supervisor/store',       label: 'Dükkan'           },
+  { href: '/supervisor/schedule',    label: 'Çizelge'          },
+  { href: '/supervisor/assignments', label: 'Atamalar'         },
+  { href: '/supervisor/tasks',       label: 'Görevler'         },
+  { href: '/supervisor/zones',       label: 'Bölgeler'         },
+  { href: '/supervisor/breaks',      label: 'Molalar'          },
 ];
 
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {

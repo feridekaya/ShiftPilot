@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { User } from '@/types';
 import * as userService from '@/services/users';
 import * as scheduleService from '@/services/schedule';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
+import { downloadExcel } from '@/lib/excel';
 
 // ── Date utils ────────────────────────────────────────────────────────────────
 function getMonday(d: Date): Date {
@@ -55,16 +57,25 @@ function timeDisplay(t: string | null): string {
   return t.slice(0, 5).replace(':', '.');
 }
 
-// ── Cell editor (inline popover) ──────────────────────────────────────────────
+// ── Cell editor (portal-based, fixed positioning to escape overflow) ──────────
 interface EditorProps {
   cell: Cell;
   onSave: (c: Cell) => void;
   onClose: () => void;
+  anchorRect: DOMRect;
 }
 
-function CellEditor({ cell, onSave, onClose }: EditorProps) {
+function CellEditor({ cell, onSave, onClose, anchorRect }: EditorProps) {
   const [local, setLocal] = useState<Cell>(cell);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Position: below the cell, aligned left; flip up if near bottom of viewport
+  const spaceBelow = window.innerHeight - anchorRect.bottom;
+  const popupHeight = 220; // approx
+  const top = spaceBelow > popupHeight
+    ? anchorRect.bottom + 4
+    : anchorRect.top - popupHeight - 4;
+  const left = Math.min(anchorRect.left, window.innerWidth - 220);
 
   // Close on click outside
   useEffect(() => {
@@ -75,7 +86,7 @@ function CellEditor({ cell, onSave, onClose }: EditorProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  // Close on Escape
+  // Close on Escape / Enter
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -85,10 +96,11 @@ function CellEditor({ cell, onSave, onClose }: EditorProps) {
     return () => document.removeEventListener('keydown', handler);
   }, [local, onSave, onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
-      className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-52"
+      style={{ position: 'fixed', top, left, zIndex: 9999 }}
+      className="bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-52"
       onMouseDown={e => e.stopPropagation()}
     >
       {/* OFF toggle */}
@@ -155,7 +167,8 @@ function CellEditor({ cell, onSave, onClose }: EditorProps) {
           İptal
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -164,7 +177,7 @@ export default function SchedulePage() {
   const [monday, setMonday] = useState<Date>(() => getMonday(new Date()));
   const [users, setUsers] = useState<User[]>([]);
   const [cells, setCells] = useState<CellMap>({});
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ key: string; rect: DOMRect } | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -227,24 +240,45 @@ export default function SchedulePage() {
     setDirty(true);
   }
 
+  function handleExport() {
+    const rows: Record<string, unknown>[] = [];
+    for (const u of users) {
+      const row: Record<string, unknown> = { 'İsim': u.name, 'Rol': u.role === 'manager' ? 'Yönetici' : u.role === 'supervisor' ? 'Şef' : 'Personel' };
+      for (const d of weekDates) {
+        const dateStr = toISO(d);
+        const cell = getCell(u.id, dateStr);
+        const label = cell.is_off ? 'OFF' : cell.start_time ? `${cell.start_time.slice(0,5)}-${cell.end_time?.slice(0,5) ?? ''}` : '';
+        row[dateStr] = label;
+      }
+      rows.push(row);
+    }
+    downloadExcel([{ name: 'Çizelge', rows }], `cizelge_${toISO(monday)}`);
+  }
+
   async function handleSave() {
     setSaving(true);
-    const payload: scheduleService.WorkScheduleEntry[] = [];
-    for (const [key, cell] of Object.entries(cells)) {
-      const [userId, dateStr] = key.split('|');
-      if (cell.is_off || cell.start_time) {
-        payload.push({
-          user_id: Number(userId),
-          date: dateStr,
-          is_off: cell.is_off,
-          start_time: cell.start_time || null,
-          end_time: cell.end_time || null,
-        });
+    try {
+      const payload: scheduleService.WorkScheduleEntry[] = [];
+      for (const [key, cell] of Object.entries(cells)) {
+        const [userId, dateStr] = key.split('|');
+        if (cell.is_off || cell.start_time) {
+          payload.push({
+            user_id: Number(userId),
+            date: dateStr,
+            is_off: cell.is_off,
+            start_time: cell.start_time || null,
+            end_time: cell.end_time || null,
+          });
+        }
       }
+      await scheduleService.bulkSaveSchedules(payload);
+      setDirty(false);
+    } catch (err) {
+      console.error('Çizelge kaydedilemedi:', err);
+      alert('Kayıt sırasında hata oluştu. Konsolu kontrol edin.');
+    } finally {
+      setSaving(false);
     }
-    await scheduleService.bulkSaveSchedules(payload);
-    setSaving(false);
-    setDirty(false);
   }
 
   return (
@@ -265,6 +299,7 @@ export default function SchedulePage() {
           <Button variant="secondary" size="sm" onClick={() => setMonday(getMonday(new Date()))}>Bu Hafta</Button>
           <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, 7)))}>Sonraki →</Button>
           <Button variant="secondary" size="sm" onClick={copyPreviousWeek}>↩ Geçen Haftayı Getir</Button>
+          <Button variant="secondary" size="sm" onClick={handleExport}>⬇ Excel</Button>
           <Button size="sm" isLoading={saving} onClick={handleSave}>
             {dirty ? 'Kaydet ●' : 'Kaydet'}
           </Button>
@@ -274,7 +309,7 @@ export default function SchedulePage() {
       {loading ? (
         <div className="flex justify-center mt-20"><Spinner size="lg" /></div>
       ) : (
-        <div className="overflow-x-auto rounded-xl shadow border border-gray-100">
+        <div className="overflow-x-auto rounded-xl shadow border border-gray-200">
           <table className="min-w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-800 text-white">
@@ -292,12 +327,14 @@ export default function SchedulePage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u, ri) => (
-                <tr key={u.id} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              {users.map((u, ri) => {
+                const rowBg = (['bg-white', 'bg-[#f3f4f6]', 'bg-[#e5e7eb]'] as const)[ri % 3];
+                return (
+                <tr key={u.id} className={`${rowBg}`}>
                   {/* Sticky name column */}
-                  <td className={`sticky left-0 z-10 px-4 py-2 font-bold text-sm border-r border-gray-100 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    <div>{u.name}</div>
-                    <div className="text-[10px] text-gray-400 font-normal">{
+                  <td className={`sticky left-0 z-10 px-4 py-3 font-bold text-sm border-r border-[#d1d5db] ${rowBg}`}>
+                    <div className="text-gray-900">{u.name}</div>
+                    <div className="text-[10px] text-gray-500 font-normal mt-0.5">{
                       u.role === 'manager' ? 'Yönetici' : u.role === 'supervisor' ? 'Şef' : 'Personel'
                     }</div>
                   </td>
@@ -306,54 +343,49 @@ export default function SchedulePage() {
                     const dateStr = toISO(d);
                     const key = cellKey(u.id, dateStr);
                     const cell = getCell(u.id, dateStr);
-                    const isEditing = editing === key;
+                    const isEditing = editing?.key === key;
                     const hasValue = cell.is_off || !!cell.start_time;
 
                     return (
                       <td
                         key={di}
-                        className="relative border-l border-gray-100 p-0"
+                        className="relative border border-[#d1d5db] p-0"
                       >
                         <div
-                          onClick={() => setEditing(isEditing ? null : key)}
+                          onClick={(e) => {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setEditing(isEditing ? null : { key, rect });
+                          }}
                           className={`
-                            h-full min-h-[48px] flex flex-col items-center justify-center cursor-pointer px-2 py-2 transition-colors
+                            h-full min-h-[48px] flex items-center justify-center cursor-pointer px-2 py-2 transition-colors
                             ${cell.is_off
-                              ? 'bg-green-50 hover:bg-green-100'
-                              : hasValue
-                                ? 'hover:bg-blue-50'
-                                : 'hover:bg-gray-100'}
+                              ? 'bg-green-100 hover:bg-[#e0f2fe]'
+                              : 'hover:bg-[#e0f2fe]'}
                           `}
                         >
                           {cell.is_off ? (
-                            <span className="text-green-700 font-bold text-xs tracking-wider">OFF</span>
+                            <span className="text-[#000000] font-semibold text-sm">OFF</span>
                           ) : hasValue ? (
-                            <>
-                              <span className="text-gray-800 font-semibold text-xs">
-                                {timeDisplay(cell.start_time)}
-                              </span>
-                              <span className="text-gray-400 text-[9px]">—</span>
-                              <span className="text-gray-800 font-semibold text-xs">
-                                {timeDisplay(cell.end_time)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
+                            <span className="text-[#000000] font-semibold text-sm whitespace-nowrap">
+                              {timeDisplay(cell.start_time)} / {timeDisplay(cell.end_time)}
+                            </span>
+                          ) : null}
                         </div>
 
-                        {isEditing && (
+                        {isEditing && editing && (
                           <CellEditor
                             cell={cell}
                             onSave={val => updateCell(u.id, dateStr, val)}
                             onClose={() => setEditing(null)}
+                            anchorRect={editing.rect}
                           />
                         )}
                       </td>
                     );
                   })}
                 </tr>
-              ))}
+                );
+              })}
               {users.length === 0 && (
                 <tr>
                   <td colSpan={8} className="text-center py-10 text-gray-400">Aktif kullanıcı bulunamadı.</td>

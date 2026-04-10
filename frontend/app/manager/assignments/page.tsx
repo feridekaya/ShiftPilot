@@ -1,12 +1,37 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { User, Task, TaskCategory, TaskSchedule } from '@/types';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { User, Task, TaskCategory, TaskSchedule, Assignment } from '@/types';
 import * as userService from '@/services/users';
 import * as taskService from '@/services/tasks';
 import * as assignmentService from '@/services/assignments';
+import * as scheduleService from '@/services/schedule';
 import Spinner from '@/components/ui/Spinner';
 import Button from '@/components/ui/Button';
+import { downloadExcel } from '@/lib/excel';
+
+// ── Week utils ─────────────────────────────────────────────────────────────────
+function getMonday(d: Date): Date {
+  const r = new Date(d);
+  const day = r.getDay();
+  r.setDate(r.getDate() - (day === 0 ? 6 : day - 1));
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+
+// ── Status color ───────────────────────────────────────────────────────────────
+const STATUS_STYLE: Record<string, string> = {
+  pending:   'bg-amber-50 border-amber-300 text-amber-800',
+  completed: 'bg-blue-50 border-blue-300 text-blue-700',
+  approved:  'bg-green-50 border-green-300 text-green-700',
+  rejected:  'bg-red-50 border-red-300 text-red-700',
+};
+const STATUS_LABEL: Record<string, string> = {
+  pending:   'Bekliyor',
+  completed: 'Tamamlandı',
+  approved:  'Onaylandı',
+  rejected:  'Reddedildi',
+};
 
 // ── Category display config ────────────────────────────────────────────────────
 const CATEGORY_LABELS: Record<TaskCategory, string> = {
@@ -83,6 +108,14 @@ interface Toast { id: number; msg: string; type: 'warn' | 'error' | 'ok' }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AssignmentsPage() {
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
+
+  // ── Weekly state ─────────────────────────────────────────────────────────────
+  const [weekMonday, setWeekMonday] = useState<Date>(() => getMonday(new Date()));
+  const [weekData, setWeekData] = useState<Record<string, Assignment[]>>({});
+  const [weekSchedules, setWeekSchedules] = useState<scheduleService.WorkScheduleEntry[]>([]);
+  const [weekLoading, setWeekLoading] = useState(false);
+
   const [date, setDate] = useState<Date>(() => new Date());
   const [employees, setEmployees] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -292,6 +325,67 @@ export default function AssignmentsPage() {
     }
   }
 
+  function handleExport() {
+    const rows: Record<string, unknown>[] = [];
+    for (const [taskIdStr, userIds] of Object.entries(plan)) {
+      const task = tasks.find(t => t.id === Number(taskIdStr));
+      if (!task || userIds.length === 0) continue;
+      for (const uid of userIds) {
+        const user = employees.find(u => u.id === uid);
+        rows.push({
+          'Tarih': toISO(date),
+          'Kategori': CATEGORY_LABELS[task.category] ?? task.category,
+          'Görev': task.title,
+          'Bölge': task.zone?.name ?? '',
+          'Personel': user?.name ?? '',
+          'Rol': user?.role ?? '',
+          'Katsayı': userIds.length > 1 ? (task.coefficient / userIds.length).toFixed(2) : task.coefficient,
+        });
+      }
+    }
+    rows.sort((a, b) => String(a['Kategori']).localeCompare(String(b['Kategori']), 'tr'));
+    downloadExcel([{ name: 'Atamalar', rows }], `atamalar_${toISO(date)}`);
+  }
+
+  // ── Weekly data load ────────────────────────────────────────────────────────
+  const loadWeek = useCallback(async (monday: Date) => {
+    setWeekLoading(true);
+    const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const [assignmentResults, schedules] = await Promise.all([
+      Promise.all(days.map(d => assignmentService.getAssignments({ date: toISO(d) }))),
+      scheduleService.getWeekSchedules(toISO(monday)),
+    ]);
+    const map: Record<string, Assignment[]> = {};
+    days.forEach((d, i) => { map[toISO(d)] = assignmentResults[i]; });
+    setWeekData(map);
+    setWeekSchedules(schedules);
+    setWeekLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === 'weekly' && !loading) loadWeek(weekMonday);
+  }, [viewMode, weekMonday, loading, loadWeek]);
+
+  function switchToDay(d: Date) {
+    setDate(d);
+    setViewMode('daily');
+  }
+
+  function weeklyExport() {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(weekMonday, i));
+    const rows: Record<string, unknown>[] = [];
+    for (const emp of employees) {
+      const row: Record<string, unknown> = { 'Personel': emp.name, 'Rol': emp.role };
+      for (const d of days) {
+        const dateStr = toISO(d);
+        const empAssignments = (weekData[dateStr] ?? []).filter(a => a.user.id === emp.id);
+        row[dateStr] = empAssignments.map(a => a.task.title).join(', ');
+      }
+      rows.push(row);
+    }
+    downloadExcel([{ name: 'Haftalık', rows }], `haftalik_${toISO(weekMonday)}`);
+  }
+
   // ── Drag handlers ───────────────────────────────────────────────────────────
   function onDragStart(e: React.DragEvent, userId: number, sourceTaskId: number | null) {
     dragUserId.current   = userId;
@@ -333,50 +427,97 @@ export default function AssignmentsPage() {
 
   if (loading) return <div className="flex justify-center mt-20"><Spinner size="lg" /></div>;
 
+  // ── Week days for weekly view ─────────────────────────────────────────────
+  const TR_MONTHS_SHORT = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const DAY_SHORT = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekMonday, i));
+  const weekEndSunday = weekDays[6];
+
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-3 overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold whitespace-nowrap">Günlük Operasyon Paneli</h1>
+      <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+        <h1 className="text-xl font-bold whitespace-nowrap">
+          {viewMode === 'daily' ? 'Günlük Operasyon Paneli' : 'Haftalık Atama Tablosu'}
+        </h1>
 
-        {/* Date nav */}
-        <div className="flex items-center gap-1">
-          <button onClick={() => setDate(d => addDays(d, -1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">←</button>
-          <span className="px-3 py-1.5 text-sm font-semibold bg-white border border-gray-200 rounded-lg min-w-[180px] text-center">
-            {dateLabel(date)}
-          </span>
-          <button onClick={() => setDate(d => addDays(d, 1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">→</button>
-          <button onClick={() => setDate(new Date())} className="ml-1 px-2 py-1 text-xs rounded hover:bg-gray-100 text-gray-500 border border-gray-200">Bugün</button>
-          <input
-            type="date"
-            value={toISO(date)}
-            onChange={e => e.target.value && setDate(fromISO(e.target.value))}
-            className="ml-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-600"
-          />
+        {/* View toggle */}
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+          <button
+            onClick={() => setViewMode('daily')}
+            className={`px-3 py-1.5 transition-colors ${viewMode === 'daily' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+          >
+            Günlük
+          </button>
+          <button
+            onClick={() => setViewMode('weekly')}
+            className={`px-3 py-1.5 transition-colors ${viewMode === 'weekly' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+          >
+            Haftalık
+          </button>
         </div>
+
+        {/* Date/week nav */}
+        {viewMode === 'daily' ? (
+          <div className="flex items-center gap-1">
+            <button onClick={() => setDate(d => addDays(d, -1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">←</button>
+            <span className="px-3 py-1.5 text-sm font-semibold bg-white border border-gray-200 rounded-lg min-w-[180px] text-center">
+              {dateLabel(date)}
+            </span>
+            <button onClick={() => setDate(d => addDays(d, 1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">→</button>
+            <button onClick={() => setDate(new Date())} className="ml-1 px-2 py-1 text-xs rounded hover:bg-gray-100 text-gray-500 border border-gray-200">Bugün</button>
+            <input
+              type="date"
+              value={toISO(date)}
+              onChange={e => e.target.value && setDate(fromISO(e.target.value))}
+              className="ml-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-600"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button onClick={() => setWeekMonday(m => getMonday(addDays(m, -7)))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">←</button>
+            <span className="px-3 py-1.5 text-sm font-semibold bg-white border border-gray-200 rounded-lg min-w-[210px] text-center">
+              {weekMonday.getDate()} {TR_MONTHS_SHORT[weekMonday.getMonth()]} – {weekEndSunday.getDate()} {TR_MONTHS_SHORT[weekEndSunday.getMonth()]} {weekEndSunday.getFullYear()}
+            </span>
+            <button onClick={() => setWeekMonday(m => getMonday(addDays(m, 7)))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">→</button>
+            <button onClick={() => setWeekMonday(getMonday(new Date()))} className="ml-1 px-2 py-1 text-xs rounded hover:bg-gray-100 text-gray-500 border border-gray-200">Bu Hafta</button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 ml-auto">
-          {dirty && (
-            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
-              Kaydedilmemiş
-            </span>
+          {viewMode === 'daily' ? (
+            <>
+              {dirty && (
+                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
+                  Kaydedilmemiş
+                </span>
+              )}
+              <Button variant="secondary" size="sm" isLoading={copying} onClick={copyPreviousDay}>
+                ↩ Dünü Kopyala
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleExport}>⬇ Excel</Button>
+              <Button size="sm" isLoading={saving} onClick={handleSave}>
+                {dirty ? 'Kaydet ●' : 'Kaydet'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="secondary" size="sm" onClick={() => loadWeek(weekMonday)}>↺ Yenile</Button>
+              <Button variant="secondary" size="sm" onClick={weeklyExport}>⬇ Excel</Button>
+            </>
           )}
-          <Button variant="secondary" size="sm" isLoading={copying} onClick={copyPreviousDay}>
-            ↩ Dünü Kopyala
-          </Button>
-          <Button size="sm" isLoading={saving} onClick={handleSave}>
-            {dirty ? 'Kaydet ●' : 'Kaydet'}
-          </Button>
         </div>
       </div>
 
-      {/* ── Legend ── */}
-      <div className="flex items-center gap-4 text-xs text-gray-400 -mt-1">
-        <span>🔓 kilitle → <span className="text-indigo-600 font-medium">🔒 sabit atama</span> (görevin tekrar gününde otomatik gelir)</span>
-        <span className="text-gray-300">|</span>
-        <span>Kilit sadece tekrarlayan görevlerde görünür</span>
-      </div>
+      {/* ── Legend (daily only) ── */}
+      {viewMode === 'daily' && (
+        <div className="flex items-center gap-4 text-xs text-gray-400 -mt-1 flex-shrink-0">
+          <span>🔓 kilitle → <span className="text-indigo-600 font-medium">🔒 sabit atama</span> (görevin tekrar gününde otomatik gelir)</span>
+          <span className="text-gray-300">|</span>
+          <span>Kilit sadece tekrarlayan görevlerde görünür</span>
+        </div>
+      )}
 
       {/* ── Toasts ── */}
       {toasts.length > 0 && (
@@ -396,12 +537,149 @@ export default function AssignmentsPage() {
         </div>
       )}
 
-      {/* ── Main layout ── */}
-      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+      {/* ── Weekly table ── */}
+      {viewMode === 'weekly' && (
+        <div className="flex-1 overflow-auto">
+          {weekLoading ? (
+            <div className="flex justify-center py-20"><Spinner size="lg" /></div>
+          ) : (
+            <>
+              {/* Legend */}
+              <div className="flex items-center gap-3 mb-3 text-[11px] text-gray-400 flex-wrap">
+                {Object.entries(STATUS_LABEL).map(([k, v]) => (
+                  <span key={k} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium ${STATUS_STYLE[k]}`}>{v}</span>
+                ))}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium bg-green-100 border-green-300 text-green-700`}>İzin (OFF)</span>
+                <span className="text-gray-300 ml-2">· Güne tıklayarak düzenleme moduna geçin</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl shadow border border-gray-200 bg-white">
+                <table className="min-w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-gray-800 text-white">
+                      <th className="sticky left-0 bg-gray-800 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-40 z-10">
+                        Personel
+                      </th>
+                      {weekDays.map((d, i) => {
+                        const isToday = toISO(d) === toISO(new Date());
+                        return (
+                          <th
+                            key={i}
+                            onClick={() => switchToDay(d)}
+                            className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-700 transition-colors"
+                          >
+                            <div className={isToday ? 'text-indigo-300' : ''}>{DAY_SHORT[i]}</div>
+                            <div className={`font-normal text-[10px] ${isToday ? 'text-indigo-400' : 'text-gray-400'}`}>
+                              {d.getDate()} {TR_MONTHS_SHORT[d.getMonth()]}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map((emp, ri) => {
+                      const rowBg = (['bg-white', 'bg-[#f3f4f6]', 'bg-[#e5e7eb]'] as const)[ri % 3];
+                      return (
+                        <tr key={emp.id} className={rowBg}>
+                          <td className={`sticky left-0 z-10 px-4 py-3 border-r border-[#d1d5db] ${rowBg}`}>
+                            <div className="font-bold text-sm text-gray-900">{emp.name}</div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">
+                              {emp.role === 'manager' ? 'Yönetici' : emp.role === 'supervisor' ? 'Şef' : 'Personel'}
+                            </div>
+                          </td>
+                          {weekDays.map((d, di) => {
+                            const dateStr = toISO(d);
+                            const sched = weekSchedules.find(s => s.user_id === emp.id && s.date === dateStr);
+                            const isOff = sched?.is_off === true;
+                            const shiftTime = !isOff && sched?.start_time
+                              ? `${sched.start_time.slice(0,5).replace(':','.')}–${sched.end_time?.slice(0,5).replace(':','.')}`
+                              : null;
+                            const dayAssignments = (weekData[dateStr] ?? []).filter(a => a.user.id === emp.id);
+
+                            return (
+                              <td
+                                key={di}
+                                onClick={() => switchToDay(d)}
+                                className={`border border-[#d1d5db] px-2 py-2 cursor-pointer hover:bg-[#e0f2fe] transition-colors align-top min-h-[60px] ${isOff ? 'bg-green-50' : ''}`}
+                              >
+                                {isOff ? (
+                                  <div className="flex flex-col gap-1">
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 border border-green-300 text-green-700 w-fit">
+                                      🌿 İzin
+                                    </span>
+                                    {dayAssignments.length > 0 && (
+                                      <span className="text-[9px] text-amber-600 font-medium">⚠ {dayAssignments.length} atama var</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-1.5">
+                                    {shiftTime && (
+                                      <div className="text-[9px] text-gray-400 font-medium mb-0.5">🕐 {shiftTime}</div>
+                                    )}
+                                    {dayAssignments.length === 0 ? (
+                                      <span className="text-gray-200 text-xs">—</span>
+                                    ) : (
+                                      dayAssignments.map(a => (
+                                        <div
+                                          key={a.id}
+                                          className={`rounded-lg border px-2 py-1 ${STATUS_STYLE[a.status] ?? STATUS_STYLE.pending}`}
+                                        >
+                                          <div className="text-[11px] font-semibold leading-tight">{a.task.title}</div>
+                                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                            {a.task.zone && (
+                                              <span className="text-[9px] opacity-70">📍{a.task.zone.name}</span>
+                                            )}
+                                            {a.shift && (
+                                              <span className="text-[9px] opacity-70">⏱{a.shift.name}</span>
+                                            )}
+                                            <span className={`text-[9px] font-bold ml-auto ${
+                                              a.status === 'approved' ? 'text-green-600' :
+                                              a.status === 'rejected' ? 'text-red-500' :
+                                              a.status === 'completed' ? 'text-blue-500' : 'text-amber-500'
+                                            }`}>
+                                              {STATUS_LABEL[a.status] ?? a.status}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                    {employees.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="text-center py-10 text-gray-400">Aktif personel bulunamadı.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary */}
+              <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                <div className="flex gap-3">
+                  <span>{weekSchedules.filter(s => s.is_off).length} kişi·gün izin</span>
+                  <span>{Object.values(weekData).flat().length} toplam atama</span>
+                </div>
+                <span>· Sütun başlığına tıklayarak o günü düzenleyin</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Main layout (daily) ── */}
+      {viewMode === 'daily' && <div className="flex gap-4 flex-1 min-h-0">
 
         {/* ── Staff Pool ── */}
         <div
-          className="w-48 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          className="w-48 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden self-start sticky top-0 max-h-[calc(100vh-160px)]"
           onDragOver={e => e.preventDefault()}
           onDrop={onPoolDrop}
         >
@@ -438,7 +716,7 @@ export default function AssignmentsPage() {
         </div>
 
         {/* ── Task Board ── */}
-        <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1 pb-4">
           {planLoading && (
             <div className="flex justify-center py-10"><Spinner size="lg" /></div>
           )}
@@ -447,7 +725,7 @@ export default function AssignmentsPage() {
             if (!catTasks || catTasks.length === 0) return null;
             const sty = CATEGORY_STYLE[cat];
             return (
-              <section key={cat} className={`rounded-xl border-2 ${sty.border} overflow-hidden`}>
+              <section key={cat} className={`rounded-xl border-2 ${sty.border} flex-shrink-0`}>
                 {/* Category header */}
                 <div className={`px-4 py-2 ${sty.header} flex items-center justify-between`}>
                   <span className="text-sm font-bold tracking-wide">{CATEGORY_LABELS[cat]}</span>
@@ -455,7 +733,7 @@ export default function AssignmentsPage() {
                 </div>
 
                 {/* Task slots */}
-                <div className="p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                <div className="p-3 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
                   {catTasks.map(task => {
                     const assigned = getAssigned(task.id);
                     const isOver = dragOverId === task.id;
@@ -467,7 +745,7 @@ export default function AssignmentsPage() {
                       <div
                         key={task.id}
                         className={`
-                          rounded-lg border-2 p-2.5 flex flex-col gap-2 min-h-[90px] transition-all
+                          rounded-lg border-2 p-2.5 flex flex-col gap-2 transition-all
                           ${isOver ? sty.dropOver : `${sty.border} ${sty.bg}`}
                         `}
                         onDragOver={e => onTaskDragOver(e, task.id)}
@@ -477,7 +755,7 @@ export default function AssignmentsPage() {
                         {/* Task name + zone + coefficient */}
                         <div className="flex items-start justify-between gap-1">
                           <button
-                            className="text-xs font-semibold text-gray-800 leading-snug text-left hover:text-indigo-700 transition-colors"
+                            className="text-xs font-semibold text-gray-800 leading-snug text-left hover:text-indigo-700 transition-colors min-w-0 break-words"
                             title={task.description || undefined}
                             onClick={() => task.description && setExpandedDescs(e => ({ ...e, [task.id]: !e[task.id] }))}
                           >
@@ -510,7 +788,7 @@ export default function AssignmentsPage() {
                         )}
 
                         {/* Assigned badges */}
-                        <div className="flex flex-wrap gap-1 flex-1">
+                        <div className="flex flex-col gap-1 flex-1">
                           {assigned.length === 0 ? (
                             <span className={`text-[10px] italic ${isOver ? 'text-indigo-500 font-medium' : 'text-gray-400'}`}>
                               {isOver ? 'Bırak ↓' : 'Sürükle...'}
@@ -523,15 +801,16 @@ export default function AssignmentsPage() {
                                 <span
                                   key={u.id}
                                   draggable
+                                  title={u.name}
                                   onDragStart={e => onDragStart(e, u.id, task.id)}
                                   onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
-                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full pl-1.5 pr-1 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border
+                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full pl-1.5 pr-1 py-0.5 font-medium shadow-sm cursor-grab active:cursor-grabbing border w-full
                                     ${isLocked
                                       ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                                       : 'bg-white border-gray-200 text-gray-700'}`}
                                 >
-                                  <span className="leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
-                                  {u.name}
+                                  <span className="leading-none shrink-0">{ROLE_ICON[u.role] ?? '👤'}</span>
+                                  <span className="truncate">{u.name}</span>
                                   {/* Lock toggle — only shown if task has a schedule */}
                                   {hasSchedule && (
                                     <button
@@ -580,7 +859,7 @@ export default function AssignmentsPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -168,9 +168,9 @@ export default function UsersPage() {
               <th className="px-4 py-3 text-left">İşlemler</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.map(u => (
-              <tr key={u.id} className={`hover:bg-gray-50 ${!u.is_active ? 'opacity-50' : ''}`}>
+          <tbody>
+            {filtered.map((u, i) => (
+              <tr key={u.id} className={`transition-colors ${['bg-white', 'bg-[#f8f9fa]', 'bg-[#f0f2f5]'][i % 3]} hover:bg-[#e9ecef] ${!u.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-3 font-medium">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
                 <td className="px-4 py-3"><Badge status={u.role} /></td>

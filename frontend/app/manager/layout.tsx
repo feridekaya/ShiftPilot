@@ -13,6 +13,9 @@ const managerLinks = [
   { href: '/manager/tasks', label: 'Görevler' },
   { href: '/manager/zones', label: 'Bölgeler' },
   { href: '/manager/assignments', label: 'Atamalar' },
+  { href: '/manager/breaks', label: 'Molalar' },
+  { href: '/manager/performance', label: 'Performans' },
+  { href: '/manager/audit',       label: 'Denetim'    },
 ];
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {

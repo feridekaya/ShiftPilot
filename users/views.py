@@ -1,9 +1,10 @@
-from rest_framework import generics, viewsets
+from rest_framework import generics, viewsets, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-
 from .models import User
-from .permissions import IsManager
+from .permissions import IsManager, IsManagerOrSupervisor
 from .serializers import (
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
@@ -36,9 +37,21 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class LogoutView(APIView):
+    """Invalidates the session. Active breaks are NOT ended on logout."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        return Response({'detail': 'logged out'}, status=status.HTTP_200_OK)
+
+
 class UserViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsManager]
     queryset = User.objects.all().order_by('name')
+
+    def get_permissions(self):
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return [IsAuthenticated(), IsManagerOrSupervisor()]
+        return [IsAuthenticated(), IsManager()]
     http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
 
     def get_serializer_class(self):
