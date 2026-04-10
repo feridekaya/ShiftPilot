@@ -20,8 +20,17 @@ class Shift(models.Model):
 
 
 class Task(models.Model):
+    CATEGORY_CHOICES = [
+        ('opening',           'Açılış'),
+        ('closing',           'Kapanış'),
+        ('responsibility',    'Sorumluluk Bölgesi'),
+        ('general',           'Genel'),
+        ('special',           'Özel'),
+    ]
+
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
     zone = models.ForeignKey(Zone, on_delete=models.SET_NULL, null=True, related_name='tasks')
     requires_photo = models.BooleanField(default=True)
     coefficient = models.PositiveIntegerField(default=1)
@@ -29,6 +38,9 @@ class Task(models.Model):
     allowed_genders = models.CharField(max_length=10, blank=True, null=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_tasks'
+    )
+    permanent_assignees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name='permanent_tasks'
     )
 
     def __str__(self):
@@ -38,6 +50,7 @@ class Task(models.Model):
 class TaskSchedule(models.Model):
     FREQUENCY_CHOICES = [
         ('multiple_daily', 'Multiple times per day'),
+        ('interval_daily', 'Every X hours'),
         ('daily', 'Daily'),
         ('weekly', 'Weekly'),
         ('monthly', 'Monthly'),
@@ -47,6 +60,7 @@ class TaskSchedule(models.Model):
     task = models.OneToOneField(Task, on_delete=models.CASCADE, related_name='schedule')
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
     times_per_day = models.PositiveIntegerField(default=1)
+    interval_hours = models.PositiveIntegerField(null=True, blank=True)
     days_of_week = models.JSONField(default=list, blank=True)
     month_day = models.PositiveIntegerField(null=True, blank=True)
     month = models.PositiveIntegerField(null=True, blank=True)

@@ -5,18 +5,18 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.permissions import IsManager
+from users.permissions import IsManager, IsManagerOrSupervisor
 from .models import Zone, Shift, Task, TaskSchedule, WorkSchedule
 from .serializers import ZoneSerializer, ShiftSerializer, TaskSerializer, TaskScheduleSerializer, WorkScheduleSerializer
 
 
 class ReadOnlyOrManagerMixin:
-    """Allow read for any authenticated user; write only for managers."""
+    """Allow read for any authenticated user; write for managers and supervisors."""
 
     def get_permissions(self):
         if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
             return [IsAuthenticated()]
-        return [IsAuthenticated(), IsManager()]
+        return [IsAuthenticated(), IsManagerOrSupervisor()]
 
 
 class ZoneViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
@@ -33,13 +33,24 @@ class ShiftViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
 
 class TaskViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
     serializer_class = TaskSerializer
-    http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
-        return Task.objects.select_related('zone', 'created_by').all()
+        return Task.objects.select_related('zone', 'created_by').prefetch_related('permanent_assignees').all()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['patch'], url_path='set-permanent-assignees',
+            permission_classes=[IsAuthenticated, IsManagerOrSupervisor])
+    def set_permanent_assignees(self, request, pk=None):
+        """Set (replace) the full list of permanent assignees for a task."""
+        from users.models import User as UserModel
+        task = self.get_object()
+        user_ids = request.data.get('user_ids', [])
+        users = UserModel.objects.filter(id__in=user_ids)
+        task.permanent_assignees.set(users)
+        return Response(TaskSerializer(task, context={'request': request}).data)
 
 
 class TaskScheduleViewSet(ReadOnlyOrManagerMixin, viewsets.ModelViewSet):
@@ -69,7 +80,7 @@ class WorkScheduleViewSet(viewsets.ModelViewSet):
                 pass
         return qs.order_by('user__name', 'date')
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManager])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrSupervisor])
     def bulk(self, request):
         """Create or update multiple schedule entries at once."""
         items = request.data if isinstance(request.data, list) else []

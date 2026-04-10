@@ -7,10 +7,10 @@ import * as taskService from '@/services/tasks';
 import FloorLayout, { ZoneData } from '@/components/store/FloorLayout';
 import Spinner from '@/components/ui/Spinner';
 
-function resolveSectionKey(shiftName: string): 'opening' | 'shift' | 'closing' {
-  const n = shiftName.toLowerCase();
-  if (n.includes('sabah') || n.includes('açılış') || n.includes('acilis') || n.includes('opening')) return 'opening';
-  if (n.includes('akşam') || n.includes('aksam') || n.includes('kapanış') || n.includes('kapanis') || n.includes('closing')) return 'closing';
+function resolveSectionKey(a: Assignment): 'opening' | 'shift' | 'closing' {
+  const category = (a.task as { category?: string }).category;
+  if (category === 'opening') return 'opening';
+  if (category === 'closing') return 'closing';
   return 'shift';
 }
 
@@ -28,7 +28,7 @@ function buildZoneData(assignments: Assignment[]): ZoneData {
 
 const SECTIONS = [
   { key: 'opening', label: 'Açılış',  sublabel: 'Opening', dot: 'bg-amber-400', ring: 'ring-amber-500/20', countColor: 'text-amber-400' },
-  { key: 'shift',   label: 'Vardiya', sublabel: 'Shift',   dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
+  { key: 'shift',   label: 'Sorumluluk Bölgesi', sublabel: 'Responsibility', dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
   { key: 'closing', label: 'Kapanış', sublabel: 'Closing', dot: 'bg-rose-400',   ring: 'ring-rose-500/20',  countColor: 'text-rose-400'  },
 ] as const;
 
@@ -56,8 +56,7 @@ export default function StorePage() {
 
   const sectionMap: Record<string, Assignment[]> = { opening: [], shift: [], closing: [] };
   for (const a of assignments) {
-    const key = a.shift ? resolveSectionKey(a.shift.name) : 'shift';
-    sectionMap[key].push(a);
+    sectionMap[resolveSectionKey(a)].push(a);
   }
 
   const totalStaff = new Set(assignments.map(a => a.user.id)).size;

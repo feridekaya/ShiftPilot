@@ -9,7 +9,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -28,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authService.getMe()
       .then(setUser)
       .catch(() => {
-        authService.logout();
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -40,8 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard');
   }
 
-  function logout() {
-    authService.logout();
+  async function logout() {
+    await authService.logout(); // closes active break on backend before clearing tokens
     setUser(null);
     router.push('/login');
   }

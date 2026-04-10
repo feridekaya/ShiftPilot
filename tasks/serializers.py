@@ -27,12 +27,12 @@ class TaskScheduleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TaskSchedule
-        fields = ['id', 'task_id', 'frequency', 'times_per_day', 'days_of_week', 'month_day', 'month']
+        fields = ['id', 'task_id', 'frequency', 'times_per_day', 'interval_hours', 'days_of_week', 'month_day', 'month']
 
     def validate(self, data):
         frequency = data.get('frequency', getattr(self.instance, 'frequency', None))
         days = data.get('days_of_week', [])
-        if frequency in ('daily', 'multiple_daily', 'monthly', 'yearly'):
+        if frequency in ('daily', 'multiple_daily', 'interval_daily', 'monthly', 'yearly'):
             data['days_of_week'] = []
         elif frequency == 'weekly':
             if not days:
@@ -49,6 +49,12 @@ class TaskScheduleSerializer(serializers.ModelSerializer):
         return data
 
 
+class PermanentAssigneeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'role', 'gender']
+
+
 class TaskSerializer(serializers.ModelSerializer):
     zone = ZoneSerializer(read_only=True)
     zone_id = serializers.PrimaryKeyRelatedField(
@@ -59,13 +65,19 @@ class TaskSerializer(serializers.ModelSerializer):
         child=serializers.ChoiceField(choices=VALID_ROLES), default=list
     )
     schedule = TaskScheduleSerializer(read_only=True)
+    permanent_assignees = PermanentAssigneeSerializer(many=True, read_only=True)
+    permanent_assignee_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='permanent_assignees',
+        many=True, write_only=True, required=False
+    )
 
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'zone', 'zone_id',
+            'id', 'title', 'description', 'category', 'zone', 'zone_id',
             'requires_photo', 'coefficient', 'allowed_roles',
             'allowed_genders', 'created_by', 'schedule',
+            'permanent_assignees', 'permanent_assignee_ids',
         ]
 
     def validate_coefficient(self, value):
@@ -73,10 +85,24 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Coefficient must be at least 1.')
         return value
 
+    def create(self, validated_data):
+        permanent = validated_data.pop('permanent_assignees', [])
+        instance = super().create(validated_data)
+        if permanent:
+            instance.permanent_assignees.set(permanent)
+        return instance
+
+    def update(self, instance, validated_data):
+        permanent = validated_data.pop('permanent_assignees', None)
+        instance = super().update(instance, validated_data)
+        if permanent is not None:
+            instance.permanent_assignees.set(permanent)
+        return instance
+
 
 class WorkScheduleSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='user', write_only=True
+        queryset=User.objects.all(), source='user'  # read+write: GET'te integer ID, POST'ta user set eder
     )
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_role = serializers.CharField(source='user.role', read_only=True)

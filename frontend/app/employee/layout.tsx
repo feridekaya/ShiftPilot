@@ -7,8 +7,11 @@ import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
 const employeeLinks = [
-  { href: '/employee', label: 'Bugünkü Görevler' },
-  { href: '/employee/history', label: 'Geçmiş' },
+  { href: '/employee',             label: 'Görevlerim'   },
+  { href: '/employee/store',       label: 'Dükkan'       },
+  { href: '/employee/schedule',    label: 'Çizelge'      },
+  { href: '/employee/breaks',      label: 'Mola'         },
+  { href: '/employee/performance', label: 'Performansım' },
 ];
 
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {

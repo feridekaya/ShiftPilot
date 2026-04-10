@@ -1,10 +1,15 @@
 import { TaskSubmission } from '@/types';
 import api from './api';
 
-export async function createSubmission(assignmentId: number, photoUrl: string): Promise<TaskSubmission> {
+export async function createSubmission(
+  assignmentId: number,
+  photoUrls: string[],
+  staffNote: string = ''
+): Promise<TaskSubmission> {
   const { data } = await api.post<TaskSubmission>('/api/assignments/submissions/', {
     assignment_id: assignmentId,
-    photo_url: photoUrl,
+    photo_urls: photoUrls,
+    staff_note: staffNote,
   });
   return data;
 }
@@ -19,10 +24,10 @@ export async function getSubmissions(filters?: { status?: string; assignment_id?
   return data;
 }
 
-export async function approveSubmission(id: number, note?: string): Promise<TaskSubmission> {
+export async function approveSubmission(id: number, note?: string, rating?: number): Promise<TaskSubmission> {
   const { data } = await api.put<TaskSubmission>(
     `/api/assignments/submissions/${id}/approve/`,
-    { note: note || '' }
+    { note: note || '', ...(rating ? { rating } : {}) }
   );
   return data;
 }

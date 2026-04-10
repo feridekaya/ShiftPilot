@@ -28,6 +28,7 @@ const ACCENTS: Record<string, {
   cyan:    { border: 'border-cyan-500/25',    glow: 'shadow-cyan-500/20',    labelColor: 'text-cyan-400',    badgeBg: 'bg-cyan-500/15',    badgeText: 'text-cyan-100',    dot: 'bg-cyan-400',    activeBg: 'bg-cyan-500/10' },
   slate:   { border: 'border-slate-500/25',   glow: 'shadow-slate-500/10',   labelColor: 'text-slate-400',   badgeBg: 'bg-slate-500/15',   badgeText: 'text-slate-200',   dot: 'bg-slate-400',   activeBg: 'bg-slate-500/10' },
   teal:    { border: 'border-teal-500/25',    glow: 'shadow-teal-500/20',    labelColor: 'text-teal-400',    badgeBg: 'bg-teal-500/15',    badgeText: 'text-teal-100',    dot: 'bg-teal-400',    activeBg: 'bg-teal-500/10' },
+  orange:  { border: 'border-orange-500/25', glow: 'shadow-orange-500/20', labelColor: 'text-orange-400', badgeBg: 'bg-orange-500/15', badgeText: 'text-orange-100', dot: 'bg-orange-400', activeBg: 'bg-orange-500/10' },
 };
 
 export default function ZoneCard({ label, employees, accent, className = '', style, compact = false }: ZoneCardProps) {

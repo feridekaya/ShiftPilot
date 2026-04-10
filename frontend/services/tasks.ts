@@ -1,4 +1,4 @@
-import { Task, Zone, Shift, TaskSchedule } from '@/types';
+import { Task, Zone, Shift, TaskSchedule, TaskCategory } from '@/types';
 import api from './api';
 
 // Tasks
@@ -10,11 +10,13 @@ export async function getTasks(): Promise<Task[]> {
 export async function createTask(payload: {
   title: string;
   description?: string;
+  category?: TaskCategory;
   zone_id: number;
   requires_photo?: boolean;
   coefficient: number;
   allowed_roles: string[];
   allowed_genders?: string;
+  permanent_assignee_ids?: number[];
 }): Promise<Task> {
   const { data } = await api.post<Task>('/api/tasks/', payload);
   return data;
@@ -74,6 +76,7 @@ export interface SchedulePayload {
   task_id: number;
   frequency: string;
   times_per_day?: number;
+  interval_hours?: number | null;
   days_of_week?: number[];
   month_day?: number | null;
   month?: number | null;
@@ -91,4 +94,9 @@ export async function updateSchedule(id: number, payload: Partial<SchedulePayloa
 
 export async function deleteSchedule(id: number): Promise<void> {
   await api.delete(`/api/tasks/schedules/${id}/`);
+}
+
+export async function setPermanentAssignees(taskId: number, userIds: number[]): Promise<Task> {
+  const { data } = await api.patch<Task>(`/api/tasks/${taskId}/set-permanent-assignees/`, { user_ids: userIds });
+  return data;
 }
