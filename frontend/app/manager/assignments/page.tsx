@@ -239,7 +239,7 @@ export default function AssignmentsPage() {
     const eligible = employees.filter(u => !task.allowed_genders || u.gender === task.allowed_genders);
     setPlan(p => ({
       ...p,
-      [taskId]: [...new Set([...(p[taskId] ?? []), ...eligible.map(u => u.id)])],
+      [taskId]: Array.from(new Set([...(p[taskId] ?? []), ...eligible.map(u => u.id)])),
     }));
     setDirty(true);
   }

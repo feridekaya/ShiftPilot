@@ -272,7 +272,7 @@ export default function UsersPage() {
                           )}
                         </div>
                         {s.note && (
-                          <p className="mt-0.5 text-gray-500 italic pl-4">"{s.note}"</p>
+                          <p className="mt-0.5 text-gray-500 italic pl-4">&quot;{s.note}&quot;</p>
                         )}
                       </div>
                     ))}
