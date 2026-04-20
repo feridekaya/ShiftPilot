@@ -120,3 +120,22 @@ export interface AuthUser {
   role: Role;
   gender: Gender | null;
 }
+
+export type AnnouncementPriority = 'normal' | 'medium' | 'critical';
+
+export interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  priority: AnnouncementPriority;
+  created_by: number;
+  created_by_name: string;
+  created_by_role: Role;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  read_count: number;
+  total_users: number;
+  is_read_by_me: boolean;
+  readers: { id: number; name: string; role: string }[];
+}
