@@ -15,6 +15,241 @@ from .serializers import (
 from .utils import get_business_date
 
 
+class AssignmentSuggestView(GenericAPIView):
+    """Rule-based smart assignment suggestions for a given date."""
+    permission_classes = [IsAuthenticated, IsManagerOrSupervisor]
+
+    DISHWASH_KW = ['bulaşık', 'dishwash', 'bulaşıkhane', 'yıkama']
+    HARD_KW     = ['bulaşık', 'ağır', 'kaldırma', 'taşıma']
+
+    # Task categories that belong to each shift group
+    MORNING_CATEGORIES = {'opening'}
+    EVENING_CATEGORIES = {'closing', 'responsibility'}
+    ALL_CATEGORIES     = {'general'}
+
+    def get(self, request):
+        import random
+        from datetime import date as date_cls, timedelta
+        from collections import defaultdict
+        from users.models import User as UserModel
+        from tasks.models import Task as TaskModel, WorkSchedule
+
+        date_str = request.query_params.get('date')
+        if not date_str:
+            return Response({'error': 'date is required'}, status=400)
+        try:
+            target_date = date_cls.fromisoformat(date_str)
+        except ValueError:
+            return Response({'error': 'invalid date'}, status=400)
+
+        trday = target_date.weekday()  # 0=Mon … 6=Sun
+
+        # ── Employees ──────────────────────────────────────────────────────
+        employees = list(UserModel.objects.filter(role='employee', is_active=True))
+        if not employees:
+            return Response({'date': date_str, 'suggestions': [], 'employee_loads': [], 'avg_load': 0})
+
+        # Shift type per employee: 'morning' | 'evening' | 'all' | 'off'
+        work_schedules = {
+            ws.user_id: ws
+            for ws in WorkSchedule.objects.filter(user__in=employees, date=target_date)
+        }
+
+        def shift_type(emp):
+            ws = work_schedules.get(emp.id)
+            if not ws:
+                return 'all'        # no schedule = no restriction
+            if ws.is_off:
+                return 'off'
+            if ws.start_time is None:
+                return 'all'
+            return 'morning' if ws.start_time.hour < 12 else 'evening'
+
+        emp_shift = {emp.id: shift_type(emp) for emp in employees}
+        active_employees = [e for e in employees if emp_shift[e.id] != 'off']
+
+        # Determine "new" employees: hired < 30 days ago OR < 5 completed assignments
+        cutoff = target_date - timedelta(days=30)
+        completed_counts = dict(
+            Assignment.objects.filter(
+                user__role='employee',
+                status__in=['completed', 'approved'],
+            ).values('user_id').annotate(n=Count('id')).values_list('user_id', 'n')
+        )
+        new_emp_ids = {
+            emp.id for emp in active_employees
+            if emp.created_at.date() > cutoff or completed_counts.get(emp.id, 0) < 5
+        }
+
+        # ── Tasks ──────────────────────────────────────────────────────────
+        tasks = list(TaskModel.objects.select_related('zone').prefetch_related('permanent_assignees'))
+
+        def task_applies(t):
+            try:
+                sch = t.schedule
+            except Exception:
+                return True
+            if not sch:
+                return True
+            freq = sch.frequency
+            if freq in ('daily', 'multiple_daily', 'interval_daily'):
+                return True
+            if freq == 'weekly':
+                dow = sch.days_of_week or []
+                return trday in dow or trday in [int(d) for d in dow]
+            if freq == 'monthly':
+                return target_date.day == sch.month_day
+            if freq == 'yearly':
+                return target_date.day == sch.month_day and target_date.month == sch.month
+            return False
+
+        available_tasks = [t for t in tasks if task_applies(t)]
+
+        # ── Current load already assigned on this date ──────────────────────
+        employee_loads = defaultdict(float)
+        for a in Assignment.objects.filter(date=target_date).select_related('task'):
+            employee_loads[a.user_id] += float(a.coefficient_share or a.task.coefficient)
+        for emp in active_employees:
+            employee_loads.setdefault(emp.id, 0.0)
+
+        # ── Helpers ────────────────────────────────────────────────────────
+        def is_dishwash(task):
+            combined = (task.title + ' ' + (task.description or '')).lower()
+            return any(kw in combined for kw in self.DISHWASH_KW)
+
+        def is_hard(task):
+            combined = (task.title + ' ' + (task.description or '')).lower()
+            return any(kw in combined for kw in self.HARD_KW)
+
+        def shift_eligible(emp, task_category):
+            """Return True if employee's shift matches the task's category."""
+            s = emp_shift[emp.id]
+            if s == 'all':
+                return True
+            if task_category in self.MORNING_CATEGORIES:
+                return s == 'morning'
+            if task_category in self.EVENING_CATEGORIES:
+                return s == 'evening'
+            return True  # general / special → everyone
+
+        def build_pool(task):
+            dishwash = is_dishwash(task)
+            hard     = is_hard(task)
+            result = []
+            for emp in active_employees:
+                if task.allowed_genders and emp.gender != task.allowed_genders:
+                    continue
+                if dishwash and emp.gender == 'female':
+                    continue
+                if emp.id in new_emp_ids and (task.coefficient > 3 or hard or dishwash):
+                    continue
+                if task.allowed_roles and emp.role not in task.allowed_roles:
+                    continue
+                if not shift_eligible(emp, task.category):
+                    continue
+                result.append(emp)
+
+            # Fallback 1: relax new-employee restriction
+            if not result:
+                result = [e for e in active_employees
+                          if (not task.allowed_genders or e.gender == task.allowed_genders)
+                          and not (dishwash and e.gender == 'female')
+                          and shift_eligible(e, task.category)]
+
+            # Fallback 2: relax shift restriction too
+            if not result:
+                result = [e for e in active_employees
+                          if (not task.allowed_genders or e.gender == task.allowed_genders)
+                          and not (dishwash and e.gender == 'female')]
+
+            return result
+
+        def pick_least_loaded(pool):
+            """Among the pool, pick randomly from those with the minimum load."""
+            min_load = min(employee_loads[e.id] for e in pool)
+            tied = [e for e in pool if employee_loads[e.id] == min_load]
+            return random.choice(tied)
+
+        # ── Build suggestions ──────────────────────────────────────────────
+        suggestions = []
+
+        for task in available_tasks:
+            # Special tasks are not auto-suggested — manager assigns manually
+            if task.category == 'special':
+                continue
+
+            permanents = list(task.permanent_assignees.filter(is_active=True))
+            if permanents:
+                share = round(task.coefficient / len(permanents), 2)
+                for emp in permanents:
+                    suggestions.append({
+                        'task_id':           task.id,
+                        'task_title':        task.title,
+                        'task_category':     task.category,
+                        'task_coefficient':  task.coefficient,
+                        'zone_id':           task.zone_id,
+                        'zone_name':         task.zone.name if task.zone else None,
+                        'user_id':           emp.id,
+                        'user_name':         emp.name,
+                        'user_gender':       emp.gender,
+                        'is_new_employee':   emp.id in new_emp_ids,
+                        'coefficient_share': share,
+                        'reason':            'Sabit atanmış görev',
+                        'permanent':         True,
+                    })
+                    employee_loads[emp.id] += share
+                continue
+
+            pool = build_pool(task)
+            if not pool:
+                continue
+
+            chosen = pick_least_loaded(pool)
+
+            # Human-readable reason
+            parts = []
+            if task.category in self.MORNING_CATEGORIES:
+                parts.append('sabah vardiyası')
+            elif task.category in self.EVENING_CATEGORIES:
+                parts.append('akşam vardiyası')
+            if chosen.id in new_emp_ids:
+                parts.append('yeni çalışan')
+            parts.append(f'yük: {employee_loads[chosen.id]:.0f} puan')
+
+            suggestions.append({
+                'task_id':           task.id,
+                'task_title':        task.title,
+                'task_category':     task.category,
+                'task_coefficient':  task.coefficient,
+                'zone_id':           task.zone_id,
+                'zone_name':         task.zone.name if task.zone else None,
+                'user_id':           chosen.id,
+                'user_name':         chosen.name,
+                'user_gender':       chosen.gender,
+                'is_new_employee':   chosen.id in new_emp_ids,
+                'coefficient_share': float(task.coefficient),
+                'reason':            ' · '.join(parts),
+                'permanent':         False,
+            })
+            employee_loads[chosen.id] += float(task.coefficient)
+
+        # ── Workload balance summary ───────────────────────────────────────
+        loads = [
+            {'user_id': e.id, 'user_name': e.name,
+             'total_load': round(employee_loads[e.id], 2),
+             'shift': emp_shift[e.id]}
+            for e in active_employees
+        ]
+        avg_load = round(sum(l['total_load'] for l in loads) / len(loads), 2) if loads else 0
+
+        return Response({
+            'date':           date_str,
+            'suggestions':    suggestions,
+            'employee_loads': loads,
+            'avg_load':       avg_load,
+        })
+
+
 class PerformanceView(GenericAPIView):
     """Returns per-user performance metrics over a date range.
     Managers/supervisors see all users; employees see only themselves."""
@@ -234,20 +469,32 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         from collections import Counter
         task_counts = Counter(vi['task'].id for vi in valid_items)
 
+        def get_times_per_day(task):
+            try:
+                sch = task.schedule
+                if sch and sch.frequency in ('multiple_daily', 'interval_daily'):
+                    return max(1, sch.times_per_day or 1)
+            except Exception:
+                pass
+            return 1
+
         created_objs = []
         for vi in valid_items:
             task = vi['task']
             count = task_counts[task.id]
             coeff_share = round(task.coefficient / count, 2)
-            a = Assignment.objects.create(
-                user=vi['user'],
-                task=task,
-                zone_id=vi['zone_id'] or task.zone_id,
-                date=date_str,
-                coefficient_share=coeff_share,
-                assigned_by=request.user,
-            )
-            created_objs.append(a)
+            times = get_times_per_day(task)
+            for occ in range(1, times + 1):
+                a = Assignment.objects.create(
+                    user=vi['user'],
+                    task=task,
+                    zone_id=vi['zone_id'] or task.zone_id,
+                    date=date_str,
+                    occurrence=occ,
+                    coefficient_share=coeff_share,
+                    assigned_by=request.user,
+                )
+                created_objs.append(a)
 
         return Response({
             'created': len(created_objs),

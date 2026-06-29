@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Assignment, TaskCategory } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import * as assignmentService from '@/services/assignments';
 import * as submissionService from '@/services/submissions';
 import { CATEGORY_LABEL, CATEGORY_BORDER, CATEGORY_BADGE } from '@/lib/categoryStyles';
@@ -33,7 +34,10 @@ function PhotoModal({ assignment, onSubmit, onClose }: {
   }
 
   async function handleSubmit() {
-    if (assignment.task.requires_photo && photos.length === 0) { setError('Bu görev için fotoğraf zorunludur.'); return; }
+    if (assignment.task.requires_photo && photos.length === 0) {
+      setError('Bu görev için fotoğraf zorunludur.');
+      return;
+    }
     setError(''); setSubmitting(true);
     try { await onSubmit(assignment.id, photos, note); }
     catch { setError('Gönderi başarısız. Tekrar deneyin.'); setSubmitting(false); }
@@ -74,7 +78,9 @@ function PhotoModal({ assignment, onSubmit, onClose }: {
         <button onClick={() => inputRef.current?.click()}
           className="w-full border-2 border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl py-4 text-sm text-gray-500 hover:text-indigo-600 transition-all flex flex-col items-center gap-1">
           <span className="text-2xl">📷</span>
-          <span>{photos.length === 0 ? (assignment.task.requires_photo ? 'Fotoğraf Ekle (zorunlu)' : 'Fotoğraf Ekle (isteğe bağlı)') : '+ Daha Fazla Fotoğraf'}</span>
+          <span>{photos.length === 0
+            ? (assignment.task.requires_photo ? 'Fotoğraf Ekle (zorunlu)' : 'Fotoğraf Ekle (isteğe bağlı)')
+            : '+ Daha Fazla Fotoğraf'}</span>
         </button>
       </div>
 
@@ -178,7 +184,8 @@ function fmtDate(s: string) {
   return `${d.getDate()} ${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export default function EmployeePage() {
+export default function SupervisorMyTasksPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<'today' | 'history'>('today');
   const [todayAssignments, setTodayAssignments] = useState<Assignment[]>([]);
   const [allAssignments, setAllAssignments] = useState<Assignment[]>([]);
@@ -189,9 +196,10 @@ export default function EmployeePage() {
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
   useEffect(() => {
+    if (!user) return;
     async function load() {
       const [all, dateInfo] = await Promise.all([
-        assignmentService.getAssignments(),
+        assignmentService.getAssignments({ user_id: user!.id }),
         assignmentService.getBusinessDate(),
       ]);
       setBusinessDate(dateInfo.business_date);
@@ -199,12 +207,12 @@ export default function EmployeePage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   async function loadHistory() {
-    if (historyLoaded) return;
+    if (historyLoaded || !user) return;
     setHistoryLoading(true);
-    const all = await assignmentService.getAssignments();
+    const all = await assignmentService.getAssignments({ user_id: user.id });
     setAllAssignments(all);
     setHistoryLoaded(true);
     setHistoryLoading(false);
@@ -217,7 +225,9 @@ export default function EmployeePage() {
 
   async function handleSubmit(assignmentId: number, photos: string[], note: string) {
     await submissionService.createSubmission(assignmentId, photos, note);
-    setTodayAssignments(prev => prev.map(a => a.id === assignmentId ? { ...a, status: 'completed' as const } : a));
+    setTodayAssignments(prev =>
+      prev.map(a => a.id === assignmentId ? { ...a, status: 'completed' as const } : a)
+    );
     setSelectedAssignment(null);
   }
 
@@ -229,6 +239,11 @@ export default function EmployeePage() {
 
   return (
     <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Görevlerim</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Sana atanan görevler</p>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 max-w-xs">
         {(['today', 'history'] as const).map(t => (
@@ -239,7 +254,7 @@ export default function EmployeePage() {
         ))}
       </div>
 
-      {/* ── TODAY TAB ── */}
+      {/* TODAY */}
       {tab === 'today' && (
         <>
           <div className="flex items-center justify-between mb-5">
@@ -278,7 +293,7 @@ export default function EmployeePage() {
         </>
       )}
 
-      {/* ── HISTORY TAB ── */}
+      {/* HISTORY */}
       {tab === 'history' && (
         <>
           {historyLoading ? (
@@ -292,7 +307,6 @@ export default function EmployeePage() {
             <div className="flex flex-col gap-2">
               {history.map(a => {
                 const cat = a.task.category as TaskCategory;
-                const description = a.task.description;
                 return (
                   <div key={a.id} className={`bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden ${CATEGORY_BORDER[cat]}`}>
                     <div className="flex items-start gap-4 px-4 py-3">
@@ -309,10 +323,17 @@ export default function EmployeePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold text-sm text-gray-900 leading-snug">{a.task.title}</p>
+                          <p className="font-semibold text-sm text-gray-900 leading-snug flex items-center gap-2 flex-wrap">
+                            {a.task.title}
+                            {a.times_per_day > 1 && (
+                              <span className="text-[11px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                {a.occurrence}/{a.times_per_day}. kontrol
+                              </span>
+                            )}
+                          </p>
                           <Badge status={a.status} />
                         </div>
-                        {description && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>}
+                        {a.task.description && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{a.task.description}</p>}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
                           {a.zone && <span className="text-xs text-gray-500">📍 {a.zone.name}</span>}
                           <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE[cat]}`}>

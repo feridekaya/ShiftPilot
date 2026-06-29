@@ -119,3 +119,31 @@ export async function getPerformance(filters?: { date_from?: string; date_to?: s
   const { data } = await api.get<UserPerformance[]>(`/api/assignments/performance/${qs}`);
   return data;
 }
+
+export interface AssignmentSuggestion {
+  task_id: number;
+  task_title: string;
+  task_category: string;
+  task_coefficient: number;
+  zone_id: number | null;
+  zone_name: string | null;
+  user_id: number;
+  user_name: string;
+  user_gender: string | null;
+  is_new_employee: boolean;
+  coefficient_share: number;
+  reason: string;
+  permanent: boolean;
+}
+
+export interface SuggestResult {
+  date: string;
+  suggestions: AssignmentSuggestion[];
+  employee_loads: { user_id: number; user_name: string; total_load: number }[];
+  avg_load: number;
+}
+
+export async function suggestAssignments(date: string): Promise<SuggestResult> {
+  const { data } = await api.get<SuggestResult>(`/api/assignments/suggest/?date=${date}`);
+  return data;
+}

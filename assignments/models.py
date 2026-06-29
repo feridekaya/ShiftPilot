@@ -25,11 +25,13 @@ class Assignment(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='assigned_tasks'
     )
 
+    occurrence = models.PositiveSmallIntegerField(default=1)  # which repetition of the day (1-based)
+
     class Meta:
-        unique_together = ('user', 'task', 'date', 'shift')
+        unique_together = ('user', 'task', 'date', 'occurrence')
 
     def __str__(self):
-        return f'{self.user} - {self.task} ({self.date})'
+        return f'{self.user} - {self.task} ({self.date}) #{self.occurrence}'
 
 
 class TaskSubmission(models.Model):

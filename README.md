@@ -1,8 +1,8 @@
 # ShiftPilot
 
-Restaurant Operations & Workforce Automation SaaS.
+Restoran operasyonları ve iş gücü yönetimi için SaaS platformu.
 
-Yöneticiler çalışanlara vardiya/bölge bazlı görev atar. Çalışanlar görevleri gerçek zamanlı kamera fotoğrafı ile tamamlar. Süpervizörler fotoğraflı gönderimleri onaylar veya reddeder.
+Yöneticiler çalışanlara vardiya/bölge bazlı görev atar. Çalışanlar görevleri gerçek zamanlı kamera fotoğrafıyla tamamlar. Süpervizörler gönderimleri onaylar veya reddeder.
 
 ---
 
@@ -15,7 +15,7 @@ Yöneticiler çalışanlara vardiya/bölge bazlı görev atar. Çalışanlar gö
 | Frontend | Next.js 14 (App Router) + TailwindCSS |
 | Auth | JWT (djangorestframework-simplejwt) |
 | Görev Kuyruğu | Celery + Redis |
-| Depolama | AWS S3 / Cloudflare R2 (fotoğraflar) |
+| Depolama | AWS S3 / Cloudflare R2 |
 
 ---
 
@@ -23,15 +23,16 @@ Yöneticiler çalışanlara vardiya/bölge bazlı görev atar. Çalışanlar gö
 
 | Rol | Yetkiler |
 |-----|----------|
-| **Manager** | Kullanıcı/görev/bölge/vardiya CRUD, çalışanlara görev atama |
-| **Supervisor** | Fotoğraflı gönderimleri onaylama / reddetme |
-| **Employee** | Günlük görevleri görme, kamera fotoğrafıyla tamamlama |
+| **Manager** | Kullanıcı / görev / bölge / vardiya CRUD, çalışan atamaları, çizelge yönetimi, denetim, mola ve performans raporları |
+| **Supervisor** | Fotoğraflı gönderimleri onaylama / reddetme, atama ve bölge görüntüleme |
+| **Employee** | Günlük görevleri görme, kamera fotoğrafıyla tamamlama, mola ve performans geçmişi |
 
 ---
 
 ## Kurulum
 
 ### Gereksinimler
+
 - Python 3.10+
 - Node.js 18+
 - PostgreSQL 17+
@@ -52,32 +53,36 @@ pip install -r requirements.txt
 
 # Ortam değişkenleri
 cp .env.example .env
-# .env dosyasını düzenle (DB şifresi, secret key vb.)
+# .env dosyasını düzenle
 
-# Veritabanı
-# PostgreSQL'de "shiftpilot" veritabanını oluştur
+# Veritabanı oluştur
 psql -U postgres -c "CREATE DATABASE shiftpilot;"
 
 # Migration
 python manage.py migrate
 
-# İlk admin kullanıcısı
+# İlk yönetici kullanıcısı
 python manage.py createsuperuser
 
 # Sunucu
 python manage.py runserver
 ```
 
+### Celery (arka plan görevleri)
+
+```bash
+celery -A config worker --loglevel=info
+celery -A config beat --loglevel=info
+```
+
 ### Frontend
 
 ```bash
 cd frontend
-
 npm install
-cp .env.local.example .env.local   # veya manuel oluştur
 
-# .env.local içeriği:
-# NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+# .env.local oluştur
+echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" > .env.local
 
 npm run dev
 ```
@@ -115,33 +120,41 @@ AWS_S3_REGION_NAME=
 ### Auth
 | Method | URL | Açıklama |
 |--------|-----|----------|
-| POST | `/api/auth/login` | Giriş → JWT token + name + role |
+| POST | `/api/auth/login` | Giriş — JWT token + kullanıcı bilgisi |
 | POST | `/api/auth/register` | Kayıt |
-| GET | `/api/auth/me` | Mevcut kullanıcı |
+| GET | `/api/auth/me` | Oturum açık kullanıcı |
 
-### Kullanıcılar (Manager)
+### Kullanıcılar
 | Method | URL |
 |--------|-----|
-| GET/POST | `/api/users/` |
-| PUT/DELETE | `/api/users/{id}/` |
+| GET / POST | `/api/users/` |
+| PUT / DELETE | `/api/users/{id}/` |
 
 ### Görevler
 | Method | URL |
 |--------|-----|
-| GET/POST/PUT/DELETE | `/api/tasks/` |
-| GET/POST | `/api/tasks/zones/` |
-| GET/POST | `/api/tasks/shifts/` |
-| GET/POST | `/api/tasks/schedules/` |
+| GET / POST / PUT / DELETE | `/api/tasks/` |
+| GET / POST | `/api/tasks/zones/` |
+| GET / POST | `/api/tasks/shifts/` |
+| GET / POST | `/api/tasks/schedules/` |
+| GET / POST | `/api/tasks/work-schedules/` |
 
-### Atamalar
+### Atamalar & Gönderimlер
 | Method | URL |
 |--------|-----|
-| GET | `/api/assignments/` |
-| POST | `/api/assignments/` |
+| GET / POST | `/api/assignments/` |
 | POST | `/api/assignments/submissions/` |
 | GET | `/api/assignments/submissions/?status=pending` |
 | PUT | `/api/assignments/submissions/{id}/approve/` |
 | PUT | `/api/assignments/submissions/{id}/reject/` |
+| GET | `/api/assignments/audit/` |
+| GET | `/api/assignments/performance/` |
+
+### Molalar
+| Method | URL |
+|--------|-----|
+| GET / POST | `/api/breaks/` |
+| PUT | `/api/breaks/{id}/end/` |
 
 ---
 
@@ -149,49 +162,87 @@ AWS_S3_REGION_NAME=
 
 ```
 ShiftPilot/
-├── backend (Django)
-│   ├── config/          → Settings, URL routing
-│   ├── users/           → Custom User modeli, JWT auth, permission sınıfları
-│   ├── tasks/           → Zone, Shift, Task, TaskSchedule modelleri
-│   ├── assignments/     → Assignment, TaskSubmission modelleri
-│   ├── manage.py
-│   └── requirements.txt
+├── config/              → Settings, URL routing, Celery
+├── users/               → Kullanıcı modeli, JWT auth, izin sınıfları
+├── tasks/               → Zone, Shift, Task, TaskSchedule, WorkSchedule
+├── assignments/         → Assignment, TaskSubmission, RejectionLog, testler
+├── breaks/              → Break modeli, Celery görevleri
+├── requirements.txt
+├── manage.py
 │
-└── frontend (Next.js)
+└── frontend/
     ├── app/
-    │   ├── login/           → Giriş sayfası
-    │   ├── dashboard/       → Rol bazlı yönlendirme hub'ı
-    │   ├── manager/         → Kullanıcı, görev, bölge, vardiya, atama yönetimi
-    │   ├── supervisor/      → Fotoğraf onay/red ekranı
-    │   └── employee/        → Günlük görevler + kamera submission + geçmiş
+    │   ├── login/               → Giriş sayfası
+    │   ├── dashboard/           → Rol bazlı yönlendirme hub'ı
+    │   ├── manager/
+    │   │   ├── store/           → Dükkan genel görünümü
+    │   │   ├── users/           → Kullanıcı yönetimi
+    │   │   ├── tasks/           → Görev yönetimi
+    │   │   ├── zones/           → Bölge yönetimi
+    │   │   ├── assignments/     → Atama listesi (liste + haftalık görünüm)
+    │   │   ├── schedule/        → Çalışma çizelgesi
+    │   │   ├── breaks/          → Mola takibi + günlük ortalamalar
+    │   │   ├── performance/     → Performans raporları
+    │   │   └── audit/           → Denetim kaydı
+    │   ├── supervisor/
+    │   │   ├── page.tsx         → Bekleyen gönderimleri onayla / reddet
+    │   │   ├── assignments/     → Atama görüntüleme (haftalık)
+    │   │   ├── tasks/           → Görev listesi
+    │   │   ├── zones/           → Bölge listesi
+    │   │   ├── schedule/        → Çizelge görüntüleme
+    │   │   └── breaks/          → Mola görüntüleme
+    │   └── employee/
+    │       ├── page.tsx         → Bugünün görevleri
+    │       ├── history/         → Geçmiş atamalar
+    │       ├── schedule/        → Kişisel çizelge
+    │       ├── breaks/          → Mola geçmişi
+    │       └── performance/     → Kişisel performans
     ├── components/
-    │   ├── ui/              → Button, Input, Modal, Badge, Spinner
-    │   ├── layout/          → Navbar, Sidebar
-    │   └── CameraCapture.tsx
+    │   ├── ui/                  → Button, Input, Modal, Badge, Spinner
+    │   ├── layout/              → Navbar, Sidebar
+    │   └── CameraCapture.tsx    → Kamera zorunluluğu bileşeni
     ├── contexts/AuthContext.tsx
-    ├── services/            → API servis katmanı (axios + JWT interceptor)
-    └── types/index.ts
+    ├── services/                → API katmanı (axios + JWT interceptor)
+    ├── lib/excel.ts             → Excel dışa aktarma
+    └── types/index.ts           → TypeScript tip tanımları
 ```
 
 ---
 
 ## Önemli İş Kuralları
 
-- **Fotoğraf zorunluluğu:** Frontend yalnızca kamera erişimine izin verir (`capture="environment"`), galeri seçimi engellenir.
-- **İş yükü dengesi:** Görev atamalarında çalışanlar arası katsayı toplamı %20'den fazla sapamaz.
-- **JWT:** 8 saatlik access token, 7 günlük refresh token. 401 hatasında otomatik yenileme.
+- **Fotoğraf zorunluluğu:** Kamera erişimi `capture="environment"` ile zorlanır, galeri seçimi engellenir.
+- **İş yükü dengesi:** Atamada çalışanlar arası görev katsayısı toplamı %20'den fazla sapamaz.
+- **Mola limiti:** Çalışanlar günde yalnızca bir kez yemek molası yapabilir (20 dk).
+- **JWT:** 8 saatlik access token, 7 günlük refresh token. 401 hatasında silent refresh.
+- **Rol koruması:** Her sayfa; Manager / Supervisor / Employee için ayrı layout guard içerir.
 
 ---
 
-## Geliştirme Notları
+## Testler
 
 ```bash
-# Branch stratejisi
-git checkout -b feature/yeni-ozellik develop
+# Tüm testleri çalıştır
+python manage.py test
+
+# Yalnızca atama testleri (23 test)
+python manage.py test assignments.tests
+```
+
+Test kapsamı: görev atama → fotoğraflı gönderim → onay/red → denetim kaydı → performans görünümü.
+
+---
+
+## Git & Branch Stratejisi
+
+```bash
+# Yeni özellik
+git checkout -b feature/ozellik-adi develop
 
 # Commit formatı
 feat(scope): kısa açıklama
 fix(scope): hata düzeltme
+refactor(scope): kod iyileştirme
 ```
 
 ---

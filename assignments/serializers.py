@@ -34,6 +34,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
     assigned_by = UserSerializer(read_only=True)
     status = serializers.CharField(read_only=True)
     coefficient_share = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
+    occurrence = serializers.IntegerField(read_only=True)
+    times_per_day = serializers.SerializerMethodField()
     submissions = serializers.SerializerMethodField()
 
     class Meta:
@@ -41,8 +43,18 @@ class AssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_id', 'task', 'task_id',
             'shift', 'shift_id', 'zone', 'zone_id',
-            'date', 'status', 'coefficient_share', 'assigned_by', 'submissions',
+            'date', 'status', 'coefficient_share', 'occurrence', 'times_per_day',
+            'assigned_by', 'submissions',
         ]
+
+    def get_times_per_day(self, obj):
+        try:
+            sch = obj.task.schedule
+            if sch and sch.frequency in ('multiple_daily', 'interval_daily'):
+                return sch.times_per_day or 1
+        except Exception:
+            pass
+        return 1
 
     def get_submissions(self, obj):
         subs = obj.submission_set.prefetch_related('photos').order_by('submitted_at')
@@ -97,10 +109,22 @@ class SubmissionAssignmentSerializer(serializers.ModelSerializer):
     task_category = serializers.CharField(source='task.category', read_only=True)
     zone_name = serializers.CharField(source='zone.name', read_only=True, default=None)
     shift_name = serializers.CharField(source='shift.name', read_only=True, default=None)
+    occurrence = serializers.IntegerField(read_only=True)
+    times_per_day = serializers.SerializerMethodField()
+
+    def get_times_per_day(self, obj):
+        try:
+            sch = obj.task.schedule
+            if sch and sch.frequency in ('multiple_daily', 'interval_daily'):
+                return sch.times_per_day or 1
+        except Exception:
+            pass
+        return 1
 
     class Meta:
         model = Assignment
-        fields = ['id', 'user', 'task_title', 'task_description', 'task_category', 'zone_name', 'shift_name', 'date', 'status']
+        fields = ['id', 'user', 'task_title', 'task_description', 'task_category',
+                  'zone_name', 'shift_name', 'date', 'status', 'occurrence', 'times_per_day']
 
 
 class TaskSubmissionSerializer(serializers.ModelSerializer):

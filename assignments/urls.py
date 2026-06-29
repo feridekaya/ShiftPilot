@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AssignmentViewSet, SubmissionViewSet, BusinessDateView, PerformanceView, AuditView
+from .views import AssignmentViewSet, SubmissionViewSet, BusinessDateView, PerformanceView, AuditView, AssignmentSuggestView
 
 router = DefaultRouter()
 router.register(r'submissions', SubmissionViewSet, basename='submission')
@@ -10,5 +10,6 @@ urlpatterns = [
     path('business-date/', BusinessDateView.as_view(), name='business-date'),
     path('performance/', PerformanceView.as_view(), name='performance'),
     path('audit/', AuditView.as_view(), name='audit'),
+    path('suggest/', AssignmentSuggestView.as_view(), name='assignment-suggest'),
     path('', include(router.urls)),
 ]
