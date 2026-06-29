@@ -9,6 +9,7 @@ import * as scheduleService from '@/services/schedule';
 import Spinner from '@/components/ui/Spinner';
 import Button from '@/components/ui/Button';
 import { downloadExcel } from '@/lib/excel';
+import { getHoliday } from '@/lib/holidays';
 
 // ── Week utils ─────────────────────────────────────────────────────────────────
 function getMonday(d: Date): Date {
@@ -562,16 +563,25 @@ export default function AssignmentsPage() {
                       </th>
                       {weekDays.map((d, i) => {
                         const isToday = toISO(d) === toISO(new Date());
+                        const holiday = getHoliday(toISO(d));
                         return (
                           <th
                             key={i}
                             onClick={() => switchToDay(d)}
-                            className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-700 transition-colors"
+                            className={`px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-700 transition-colors ${holiday ? 'bg-rose-900' : ''}`}
                           >
-                            <div className={isToday ? 'text-indigo-300' : ''}>{DAY_SHORT[i]}</div>
-                            <div className={`font-normal text-[10px] ${isToday ? 'text-indigo-400' : 'text-gray-400'}`}>
+                            <div className={`flex items-center justify-center gap-1 ${isToday ? 'text-indigo-300' : ''}`}>
+                              {DAY_SHORT[i]}
+                              {holiday && <span title={holiday.name}>{holiday.type === 'national' ? '🇹🇷' : '🌙'}</span>}
+                            </div>
+                            <div className={`font-normal text-[10px] ${isToday ? 'text-indigo-400' : holiday ? 'text-rose-300' : 'text-gray-400'}`}>
                               {d.getDate()} {TR_MONTHS_SHORT[d.getMonth()]}
                             </div>
+                            {holiday && (
+                              <div className="text-[9px] text-rose-300 font-normal normal-case truncate mt-0.5 leading-tight">
+                                {holiday.name}
+                              </div>
+                            )}
                           </th>
                         );
                       })}
@@ -596,12 +606,15 @@ export default function AssignmentsPage() {
                               ? `${sched.start_time.slice(0,5).replace(':','.')}–${sched.end_time?.slice(0,5).replace(':','.')}`
                               : null;
                             const dayAssignments = (weekData[dateStr] ?? []).filter(a => a.user.id === emp.id);
+                            const holiday = getHoliday(dateStr);
 
                             return (
                               <td
                                 key={di}
                                 onClick={() => switchToDay(d)}
-                                className={`border border-[#d1d5db] px-2 py-2 cursor-pointer hover:bg-[#e0f2fe] transition-colors align-top min-h-[60px] ${isOff ? 'bg-green-50' : ''}`}
+                                className={`border border-[#d1d5db] px-2 py-2 cursor-pointer transition-colors align-top min-h-[60px] ${
+                                  isOff ? 'bg-green-50 hover:bg-green-100' : holiday ? 'bg-rose-50 hover:bg-rose-100' : 'hover:bg-[#e0f2fe]'
+                                }`}
                               >
                                 {isOff ? (
                                   <div className="flex flex-col gap-1">
@@ -614,6 +627,11 @@ export default function AssignmentsPage() {
                                   </div>
                                 ) : (
                                   <div className="flex flex-col gap-1.5">
+                                    {holiday && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 border border-rose-300 text-rose-700 w-fit">
+                                        {holiday.type === 'national' ? '🇹🇷' : '🌙'} {holiday.name}
+                                      </span>
+                                    )}
                                     {shiftTime && (
                                       <div className="text-[9px] text-gray-400 font-medium mb-0.5">🕐 {shiftTime}</div>
                                     )}
