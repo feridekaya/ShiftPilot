@@ -5,6 +5,7 @@ import { User, Task, TaskCategory, TaskSchedule, Assignment } from '@/types';
 import * as userService from '@/services/users';
 import * as taskService from '@/services/tasks';
 import * as assignmentService from '@/services/assignments';
+import type { AssignmentSuggestion } from '@/services/assignments';
 import * as scheduleService from '@/services/schedule';
 import Spinner from '@/components/ui/Spinner';
 import Button from '@/components/ui/Button';
@@ -128,6 +129,10 @@ export default function AssignmentsPage() {
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<AssignmentSuggestion[] | null>(null);
+  const [checkedSugs, setCheckedSugs] = useState<Set<number>>(new Set());
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
 
@@ -305,6 +310,37 @@ export default function AssignmentsPage() {
     } finally {
       setCopying(false);
     }
+  }
+
+  // ── Smart suggest ───────────────────────────────────────────────────────────
+  async function handleSuggest() {
+    setSuggesting(true);
+    try {
+      const result = await assignmentService.suggestAssignments(toISO(date));
+      if (result.suggestions.length === 0) { toast('Bu tarih için uygun atama önerisi bulunamadı.', 'warn'); return; }
+      setSuggestions(result.suggestions);
+      setCheckedSugs(new Set(result.suggestions.map((_, i) => i)));
+      setShowSuggestModal(true);
+    } catch {
+      toast('Öneri alınamadı, sunucu bağlantısını kontrol edin.', 'error');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function applySuggestions() {
+    if (!suggestions) return;
+    const newPlan: DayPlan = {};
+    suggestions.forEach((s, i) => {
+      if (!checkedSugs.has(i)) return;
+      if (!newPlan[s.task_id]) newPlan[s.task_id] = [];
+      if (!newPlan[s.task_id].includes(s.user_id)) newPlan[s.task_id] = [...newPlan[s.task_id], s.user_id];
+    });
+    setPlan(newPlan);
+    setDirty(true);
+    setShowSuggestModal(false);
+    setSuggestions(null);
+    toast(`${checkedSugs.size} öneri plana uygulandı. Kaydet butonuna basın.`, 'ok');
   }
 
   // ── Save ────────────────────────────────────────────────────────────────────
@@ -494,6 +530,9 @@ export default function AssignmentsPage() {
                   Kaydedilmemiş
                 </span>
               )}
+              <Button variant="secondary" size="sm" isLoading={suggesting} onClick={handleSuggest}>
+                ✦ Öner
+              </Button>
               <Button variant="secondary" size="sm" isLoading={copying} onClick={copyPreviousDay}>
                 ↩ Dünü Kopyala
               </Button>
@@ -878,6 +917,141 @@ export default function AssignmentsPage() {
           )}
         </div>
       </div>}
+
+      {/* ── Suggestion Modal ── */}
+      {showSuggestModal && suggestions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Atama Önerileri</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{dateLabel(date)} · {suggestions.length} öneri · iş yükü ve kurallar esas alındı</p>
+              </div>
+              <button onClick={() => setShowSuggestModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+
+            {/* Rules legend */}
+            <div className="px-6 py-2.5 bg-indigo-50 border-b border-indigo-100 flex flex-wrap gap-3 text-[11px] text-indigo-700">
+              <span>🌅 Açılış → sabahçılara</span>
+              <span>·</span>
+              <span>🌆 Sorumluluk/Kapanış → akşamcılara</span>
+              <span>·</span>
+              <span>⚖ Eşit yükte rastgele seçim</span>
+              <span>·</span>
+              <span>♀ Kadınlar bulaşığa atanmaz</span>
+              <span>·</span>
+              <span>🆕 Yeni → kolay görev</span>
+              <span>·</span>
+              <span>✦ Özel görevler önerilmez</span>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-1.5">
+              {/* Select / deselect all */}
+              <div className="flex items-center gap-2 px-2 pb-2 border-b border-gray-100">
+                <input
+                  type="checkbox"
+                  id="sug-all"
+                  checked={checkedSugs.size === suggestions.length}
+                  onChange={e => setCheckedSugs(e.target.checked ? new Set(suggestions.map((_, i) => i)) : new Set())}
+                  className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                />
+                <label htmlFor="sug-all" className="text-xs font-semibold text-gray-500 cursor-pointer select-none">
+                  Tümünü seç ({checkedSugs.size}/{suggestions.length})
+                </label>
+              </div>
+
+              {suggestions.map((s, i) => (
+                <label
+                  key={i}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors
+                    ${checkedSugs.has(i) ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-100 opacity-60'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checkedSugs.has(i)}
+                    onChange={e => {
+                      setCheckedSugs(prev => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(i) : next.delete(i);
+                        return next;
+                      });
+                    }}
+                    className="w-4 h-4 rounded accent-indigo-600 flex-shrink-0"
+                  />
+                  {/* Employee */}
+                  <div className="w-28 flex-shrink-0">
+                    <div className="text-sm font-semibold text-gray-800 truncate">{s.user_name}</div>
+                    <div className="flex gap-1 mt-0.5">
+                      {s.is_new_employee && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">🆕 Yeni</span>
+                      )}
+                      {s.user_gender === 'female' && (
+                        <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">♀</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <span className="text-gray-300 text-sm flex-shrink-0">→</span>
+
+                  {/* Task */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">{s.task_title}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {s.task_category === 'opening' && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">🌅 Açılış</span>
+                      )}
+                      {s.task_category === 'closing' && (
+                        <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">🌆 Kapanış</span>
+                      )}
+                      {s.task_category === 'responsibility' && (
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">📍 Sorumluluk</span>
+                      )}
+                      {s.zone_name && (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{s.zone_name}</span>
+                      )}
+                      <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-medium">
+                        {s.task_coefficient} puan
+                      </span>
+                      {s.permanent && (
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">🔒 Sabit</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div className="text-[10px] text-gray-400 max-w-[110px] text-right leading-tight">{s.reason}</div>
+                </label>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-400">
+                {checkedSugs.size} öneri uygulanacak · mevcut plan sıfırlanır
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSuggestModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={applySuggestions}
+                  disabled={checkedSugs.size === 0}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Planı Uygula
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

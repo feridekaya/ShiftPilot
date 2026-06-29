@@ -79,6 +79,8 @@ export interface Assignment {
   date: string;
   status: AssignmentStatus;
   coefficient_share: number | null;
+  occurrence: number;
+  times_per_day: number;
   assigned_by: User | null;
   submissions: SubmissionHistoryItem[];
 }

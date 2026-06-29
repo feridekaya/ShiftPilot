@@ -80,18 +80,73 @@ export default function SupervisorFeedbackPage() {
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" /></div>;
 
+  const total    = feedbacks.length;
+  const positive = feedbacks.filter(f => f.response === 'positive').length;
+  const negative = feedbacks.filter(f => f.response === 'negative').length;
+  const pending  = feedbacks.filter(f => !f.response).length;
+  const posRate  = total > 0 ? Math.round((positive / total) * 100) : 0;
+  const negRate  = total > 0 ? Math.round((negative / total) * 100) : 0;
+  const pendRate = total > 0 ? Math.round((pending  / total) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] px-4 py-8 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-7">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Geri Bildirimler</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{feedbacks.length} geri bildirim</p>
+          <p className="text-sm text-gray-400 mt-0.5">{total} geri bildirim</p>
         </div>
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 shadow-sm">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
           Feedback Yaz
         </button>
       </div>
+
+      {total > 0 && (
+        <div className="grid grid-cols-3 gap-4 mb-7">
+          <div className="bg-white rounded-2xl border border-emerald-100 p-4 flex items-center gap-4 shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.493 18.75c-.425 0-.82-.236-.975-.632A7.48 7.48 0 016 15.375c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23h-.777zM2.331 10.977a11.969 11.969 0 00-.831 4.398 12 12 0 00.52 3.507c.26.85 1.084 1.368 1.973 1.368H4.9c.445 0 .72-.498.523-.898a8.963 8.963 0 01-.924-3.977c0-1.708.476-3.305 1.302-4.666.245-.403-.028-.959-.5-.959H4.25c-.832 0-1.612.453-1.918 1.227z"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-2xl font-extrabold text-emerald-600">{posRate}%</div>
+              <div className="text-xs text-gray-500 font-medium">Olumlu <span className="text-gray-400">({positive})</span></div>
+              <div className="w-full bg-emerald-100 rounded-full h-1 mt-1.5">
+                <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${posRate}%` }} />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-red-100 p-4 flex items-center gap-4 shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M15.73 5.25h1.035A7.465 7.465 0 0118 9.375a7.465 7.465 0 01-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 01-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 00-.322 1.672V21a.75.75 0 01-.75.75 2.25 2.25 0 01-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 011.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 011.423.23l3.114 1.04a4.5 4.5 0 001.423.23zM21.669 13.773c.536-1.362.831-2.845.831-4.398 0-1.22-.182-2.398-.52-3.507-.26-.85-1.084-1.368-1.973-1.368H19.1c-.445 0-.72.498-.523.898.591 1.2.924 2.55.924 3.977a8.959 8.959 0 01-1.302 4.666c-.245.403.028.959.5.959h1.053c.832 0 1.612-.453 1.918-1.227z"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-2xl font-extrabold text-red-500">{negRate}%</div>
+              <div className="text-xs text-gray-500 font-medium">Olumsuz <span className="text-gray-400">({negative})</span></div>
+              <div className="w-full bg-red-100 rounded-full h-1 mt-1.5">
+                <div className="bg-red-500 h-1 rounded-full" style={{ width: `${negRate}%` }} />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-amber-100 p-4 flex items-center gap-4 shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-2xl font-extrabold text-amber-500">{pendRate}%</div>
+              <div className="text-xs text-gray-500 font-medium">Bekliyor <span className="text-gray-400">({pending})</span></div>
+              <div className="w-full bg-amber-100 rounded-full h-1 mt-1.5">
+                <div className="bg-amber-400 h-1 rounded-full" style={{ width: `${pendRate}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Feedback list */}
       {feedbacks.length === 0 ? (

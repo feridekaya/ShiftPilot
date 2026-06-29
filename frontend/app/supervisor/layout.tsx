@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
 const supervisorLinks = [
+  { href: '/supervisor/my-tasks',    label: 'Görevlerim'       },
   { href: '/supervisor',             label: 'Onay Bekleyenler' },
   { href: '/supervisor/store',       label: 'Dükkan'           },
   { href: '/supervisor/schedule',    label: 'Çizelge'          },
