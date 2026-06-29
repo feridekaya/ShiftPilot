@@ -10,6 +10,8 @@ const supervisorLinks = [
   { href: '/supervisor',             label: 'Onay Bekleyenler' },
   { href: '/supervisor/store',       label: 'Dükkan'           },
   { href: '/supervisor/schedule',    label: 'Çizelge'          },
+  { href: '/supervisor/announcements', label: 'Duyurular'      },
+  { href: '/supervisor/feedback',      label: 'Geri Bildirim'  },
   { href: '/supervisor/assignments', label: 'Atamalar'         },
   { href: '/supervisor/tasks',       label: 'Görevler'         },
   { href: '/supervisor/zones',       label: 'Bölgeler'         },

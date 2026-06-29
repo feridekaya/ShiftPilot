@@ -121,6 +121,24 @@ export interface AuthUser {
   gender: Gender | null;
 }
 
+export type FeedbackCategory = 'temizlik' | 'yemekler' | 'iecekler' | 'duzen' | 'ses' | 'personel' | 'genel' | 'diger';
+export type FeedbackResponse = 'positive' | 'negative';
+
+export interface Feedback {
+  id: number;
+  category: FeedbackCategory;
+  category_display: string;
+  content: string;
+  is_anonymous: boolean;
+  created_at: string;
+  user_name: string;
+  user_role: Role;
+  response: FeedbackResponse | null;
+  response_note: string;
+  responded_by_name: string | null;
+  responded_at: string | null;
+}
+
 export type AnnouncementPriority = 'normal' | 'medium' | 'critical';
 
 export interface Announcement {
