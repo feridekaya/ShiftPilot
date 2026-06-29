@@ -8,6 +8,7 @@ import * as scheduleService from '@/services/schedule';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import { downloadExcel } from '@/lib/excel';
+import { getHoliday } from '@/lib/holidays';
 
 // ── Date utils ────────────────────────────────────────────────────────────────
 function getMonday(d: Date): Date {
@@ -316,14 +317,26 @@ export default function SchedulePage() {
                 <th className="sticky left-0 bg-gray-800 px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider w-36 z-10">
                   İsim
                 </th>
-                {weekDates.map((d, i) => (
-                  <th key={i} className="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider min-w-[110px]">
-                    <div>{DAY_SHORT[i]}</div>
-                    <div className="text-gray-400 font-normal text-[10px]">
-                      {d.getDate()} {TR_MONTHS[d.getMonth()]}
-                    </div>
-                  </th>
-                ))}
+                {weekDates.map((d, i) => {
+                  const dateStr = toISO(d);
+                  const holiday = getHoliday(dateStr);
+                  return (
+                    <th key={i} className={`px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider min-w-[110px] ${holiday ? 'bg-rose-900' : ''}`}>
+                      <div className="flex items-center justify-center gap-1">
+                        {DAY_SHORT[i]}
+                        {holiday && <span title={holiday.name}>{holiday.type === 'religious' ? '🌙' : holiday.type === 'arife' ? '🌙' : '🇹🇷'}</span>}
+                      </div>
+                      <div className={`font-normal text-[10px] ${holiday ? 'text-rose-300' : 'text-gray-400'}`}>
+                        {d.getDate()} {TR_MONTHS[d.getMonth()]}
+                      </div>
+                      {holiday && (
+                        <div className="text-[9px] text-rose-300 font-normal normal-case truncate max-w-[100px] mx-auto mt-0.5 leading-tight">
+                          {holiday.name}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -345,6 +358,7 @@ export default function SchedulePage() {
                     const cell = getCell(u.id, dateStr);
                     const isEditing = editing?.key === key;
                     const hasValue = cell.is_off || !!cell.start_time;
+                    const holiday = getHoliday(dateStr);
 
                     return (
                       <td
@@ -357,10 +371,12 @@ export default function SchedulePage() {
                             setEditing(isEditing ? null : { key, rect });
                           }}
                           className={`
-                            h-full min-h-[48px] flex items-center justify-center cursor-pointer px-2 py-2 transition-colors
+                            h-full min-h-[48px] flex flex-col items-center justify-center cursor-pointer px-2 py-2 transition-colors
                             ${cell.is_off
                               ? 'bg-green-100 hover:bg-[#e0f2fe]'
-                              : 'hover:bg-[#e0f2fe]'}
+                              : holiday
+                                ? 'bg-rose-50 hover:bg-rose-100'
+                                : 'hover:bg-[#e0f2fe]'}
                           `}
                         >
                           {cell.is_off ? (
@@ -370,6 +386,11 @@ export default function SchedulePage() {
                               {timeDisplay(cell.start_time)} / {timeDisplay(cell.end_time)}
                             </span>
                           ) : null}
+                          {holiday && !cell.is_off && (
+                            <span className="text-[9px] text-rose-500 font-semibold mt-0.5 leading-tight text-center">
+                              {holiday.type === 'religious' || holiday.type === 'arife' ? '🌙' : '🇹🇷'} Tatil
+                            </span>
+                          )}
                         </div>
 
                         {isEditing && editing && (
