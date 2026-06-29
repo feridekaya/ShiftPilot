@@ -10,6 +10,8 @@ const employeeLinks = [
   { href: '/employee',             label: 'Görevlerim'   },
   { href: '/employee/store',       label: 'Dükkan'       },
   { href: '/employee/schedule',    label: 'Çizelge'      },
+  { href: '/employee/announcements', label: 'Duyurular'     },
+  { href: '/employee/feedback',      label: 'Geri Bildirim' },
   { href: '/employee/breaks',      label: 'Mola'         },
   { href: '/employee/performance', label: 'Performansım' },
 ];

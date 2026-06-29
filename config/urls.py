@@ -17,4 +17,6 @@ urlpatterns = [
     path('api/tasks/', include('tasks.urls')),
     path('api/assignments/', include('assignments.urls')),
     path('api/breaks/', include('breaks.urls')),
+    path('api/announcements/', include('announcements.urls')),
+    path('api/feedback/', include('feedback.urls')),
 ]

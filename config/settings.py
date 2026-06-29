@@ -29,6 +29,8 @@ INSTALLED_APPS = [
     'tasks',
     'assignments',
     'breaks',
+    'announcements',
+    'feedback',
 ]
 
 MIDDLEWARE = [

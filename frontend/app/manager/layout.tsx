@@ -14,6 +14,8 @@ const managerLinks = [
   { href: '/manager/zones', label: 'Bölgeler' },
   { href: '/manager/assignments', label: 'Atamalar' },
   { href: '/manager/breaks', label: 'Molalar' },
+  { href: '/manager/announcements', label: 'Duyurular' },
+  { href: '/manager/feedback',      label: 'Geri Bildirim' },
   { href: '/manager/performance', label: 'Performans' },
   { href: '/manager/audit',       label: 'Denetim'    },
 ];
