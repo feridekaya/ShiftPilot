@@ -562,8 +562,11 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             except (UserModel.DoesNotExist, TaskModel.DoesNotExist):
                 errors.append(f'Geçersiz kullanıcı ({user_id}) veya görev ({task_id}).')
                 continue
-            # Managers bypass gender/role restrictions
-            if user.role != 'manager' and task.allowed_genders and user.gender != task.allowed_genders:
+            # Managers cannot be assigned tasks
+            if user.role == 'manager':
+                errors.append(f'{user.name} → {task.title}: yöneticilere görev atanamaz.')
+                continue
+            if task.allowed_genders and user.gender != task.allowed_genders:
                 gender_label = 'erkek' if task.allowed_genders == 'male' else 'kadın'
                 errors.append(f'{user.name} → {task.title}: sadece {gender_label} personel atanabilir.')
                 continue
