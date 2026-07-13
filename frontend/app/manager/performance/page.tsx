@@ -76,6 +76,9 @@ export default function PerformancePage() {
       'Onay %': r.approval_rate ?? '',
       'Tekrar %': r.redo_rate ?? '',
       'Ort. Deneme': r.avg_submissions_per_task ?? '',
+      'FB Olumlu': r.feedback_positive,
+      'FB Olumsuz': r.feedback_negative,
+      'FB Olumlu %': r.feedback_pos_rate ?? '',
     }));
     downloadExcel([{ name: 'Performans', rows }], `performans_${dateFrom}_${dateTo}`);
   }
@@ -224,6 +227,9 @@ export default function PerformancePage() {
                   <Th label="Onay %" k="approval_rate" right />
                   <Th label="Tekrar %" k="redo_rate" right />
                   <Th label="Ort. Deneme" k="avg_submissions_per_task" right />
+                  <th className="px-3 py-3 text-xs uppercase tracking-wider text-right text-gray-500 border-l border-indigo-100" colSpan={3}>
+                    Feedback Yönetimi
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -243,11 +249,14 @@ export default function PerformancePage() {
                     <td className={`px-3 py-3 text-right ${rateColor(row.approval_rate)}`}>{pct(row.approval_rate)}</td>
                     <td className={`px-3 py-3 text-right ${rateColor(row.redo_rate, true)}`}>{pct(row.redo_rate)}</td>
                     <td className="px-3 py-3 text-right font-mono text-gray-600">{num(row.avg_submissions_per_task, 2)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-emerald-700 border-l border-indigo-50">{row.feedback_positive > 0 ? row.feedback_positive : <span className="text-gray-300">—</span>}</td>
+                    <td className="px-3 py-3 text-right font-mono text-rose-600">{row.feedback_negative > 0 ? row.feedback_negative : <span className="text-gray-300">—</span>}</td>
+                    <td className={`px-3 py-3 text-right ${rateColor(row.feedback_pos_rate)}`}>{pct(row.feedback_pos_rate)}</td>
                   </tr>
                 ))}
                 {sorted.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="text-center py-10 text-gray-400">
+                    <td colSpan={15} className="text-center py-10 text-gray-400">
                       Bu dönemde veri bulunamadı.
                     </td>
                   </tr>

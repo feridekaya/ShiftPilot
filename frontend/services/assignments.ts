@@ -70,6 +70,10 @@ export interface UserPerformance {
   redo_count: number;
   total_submissions: number;
   avg_submissions_per_task: number | null;
+  feedback_positive: number;
+  feedback_negative: number;
+  feedback_total: number;
+  feedback_pos_rate: number | null;
 }
 
 export async function getStoreAssignments(): Promise<Assignment[]> {
