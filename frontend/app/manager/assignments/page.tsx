@@ -100,6 +100,9 @@ function dateLabel(d: Date): string {
 // ── Types ─────────────────────────────────────────────────────────────────────
 // taskId → userId[]
 type DayPlan = Record<number, number[]>;
+// taskId → {userId, status}[]
+type DoneEntry = { userId: number; status: string };
+type DonePlanMap = Record<number, DoneEntry[]>;
 // taskId → description expanded?
 type ExpandedDescs = Record<number, boolean>;
 // taskId → Set of userIds that are permanently assigned
@@ -122,6 +125,7 @@ export default function AssignmentsPage() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plan, setPlan] = useState<DayPlan>({});
+  const [donePlan, setDonePlan] = useState<DonePlanMap>({}); // completed/approved/rejected — read-only
   const [permanentPlan, setPermanentPlan] = useState<PermanentPlan>({});
   const [expandedDescs, setExpandedDescs] = useState<ExpandedDescs>({});
   const [loading, setLoading] = useState(true);
@@ -144,7 +148,7 @@ export default function AssignmentsPage() {
   // ── Load static data once ───────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([userService.getUsers(), taskService.getTasks()]).then(([users, allTasks]) => {
-      setEmployees(users.filter(u => u.is_active));
+      setEmployees(users.filter(u => u.is_active && u.role !== 'manager'));
       setTasks(allTasks);
       setLoading(false);
     });
@@ -165,11 +169,19 @@ export default function AssignmentsPage() {
       setPermanentPlan(permPlan);
 
       const newPlan: DayPlan = {};
+      const newDonePlan: DonePlanMap = {};
       if (assignments.length > 0) {
-        // Real saved assignments exist for this date — use them
+        // Real saved assignments exist for this date — split by status
         for (const a of assignments) {
-          if (!newPlan[a.task.id]) newPlan[a.task.id] = [];
-          if (!newPlan[a.task.id].includes(a.user.id)) newPlan[a.task.id].push(a.user.id);
+          if (a.status === 'pending') {
+            if (!newPlan[a.task.id]) newPlan[a.task.id] = [];
+            if (!newPlan[a.task.id].includes(a.user.id)) newPlan[a.task.id].push(a.user.id);
+          } else {
+            // completed / approved / rejected — display only, not saved again
+            if (!newDonePlan[a.task.id]) newDonePlan[a.task.id] = [];
+            if (!newDonePlan[a.task.id].find(e => e.userId === a.user.id))
+              newDonePlan[a.task.id].push({ userId: a.user.id, status: a.status });
+          }
         }
         setDirty(false);
       } else {
@@ -183,6 +195,7 @@ export default function AssignmentsPage() {
         setDirty(Object.keys(newPlan).length > 0);
       }
       setPlan(newPlan);
+      setDonePlan(newDonePlan);
       setPlanLoading(false);
     });
   }, [date, loading, tasks]);
@@ -201,8 +214,18 @@ export default function AssignmentsPage() {
       .filter(Boolean) as User[];
   }
 
+  function getDoneAssigned(taskId: number): Array<User & { doneStatus: string }> {
+    return (donePlan[taskId] ?? ([] as DoneEntry[]))
+      .map(e => {
+        const u = employees.find(u => u.id === e.userId);
+        return u ? { ...u, doneStatus: e.status } : null;
+      })
+      .filter(Boolean) as Array<User & { doneStatus: string }>;
+  }
+
   function isAssigned(userId: number): boolean {
-    return Object.values(plan).some(ids => ids.includes(userId));
+    return Object.values(plan).some(ids => ids.includes(userId))
+      || Object.values(donePlan).some(entries => entries.some(e => e.userId === userId));
   }
 
   function addToTask(userId: number, taskId: number) {
@@ -210,7 +233,10 @@ export default function AssignmentsPage() {
     const user = employees.find(u => u.id === userId);
     if (!task || !user) return;
 
-    // Gender guard
+    if (user.role === 'manager') {
+      toast(`${user.name} yönetici olduğu için görev atanamaz.`, 'warn');
+      return;
+    }
     if (task.allowed_genders && user.gender !== task.allowed_genders) {
       const label = task.allowed_genders === 'male' ? 'erkek' : 'kadın';
       toast(`${user.name} → "${task.title}": sadece ${label} personel atanabilir.`, 'error');
@@ -228,7 +254,11 @@ export default function AssignmentsPage() {
       }
     }
 
-    if ((plan[taskId] ?? []).includes(userId)) return; // already there
+    if ((plan[taskId] ?? []).includes(userId)) return; // already there (pending)
+    if (donePlan[taskId]?.some(e => e.userId === userId)) {
+      toast(`${user.name} → "${task.title}": görev zaten tamamlandı/onaylandı.`, 'warn');
+      return;
+    }
 
     setPlan(p => ({ ...p, [taskId]: [...(p[taskId] ?? []), userId] }));
     setDirty(true);
@@ -355,8 +385,11 @@ export default function AssignmentsPage() {
       }
       const result = await assignmentService.bulkAssign(toISO(date), items);
       result.errors.forEach(e => toast(e, 'error'));
-      if (result.errors.length === 0) toast(`${result.created} atama kaydedildi.`, 'ok');
+      if (result.created > 0) toast(`${result.created} atama kaydedildi.`, 'ok');
+      else if (result.errors.length === 0) toast('Atamalar güncellendi.', 'ok');
       setDirty(false);
+    } catch {
+      toast('Atamalar kaydedilemedi. Sunucu hatası oluştu.', 'error');
     } finally {
       setSaving(false);
     }
@@ -793,10 +826,12 @@ export default function AssignmentsPage() {
                 <div className="p-3 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
                   {catTasks.map(task => {
                     const assigned = getAssigned(task.id);
+                    const doneAssigned = getDoneAssigned(task.id);
                     const isOver = dragOverId === task.id;
-                    const assigneeCount = assigned.length;
-                    const coeffShare = assigneeCount > 1
-                      ? (task.coefficient / assigneeCount).toFixed(2)
+                    // coefficient is split across ALL assignees (pending + done)
+                    const totalAssignees = assigned.length + doneAssigned.length;
+                    const coeffShare = totalAssignees > 1
+                      ? (task.coefficient / totalAssignees).toFixed(2)
                       : null;
                     return (
                       <div
@@ -829,7 +864,7 @@ export default function AssignmentsPage() {
                             )}
                             {coeffShare ? (
                               <span className="text-[9px] text-indigo-500 font-medium">
-                                k:{coeffShare}×{assigneeCount}
+                                k:{coeffShare}×{totalAssignees}
                               </span>
                             ) : task.coefficient > 1 ? (
                               <span className="text-[9px] text-gray-400">k:{task.coefficient}</span>
@@ -842,6 +877,35 @@ export default function AssignmentsPage() {
                           <p className="text-[10px] text-gray-500 leading-relaxed bg-white/70 rounded px-1.5 py-1 -mt-1 border border-gray-200">
                             {task.description}
                           </p>
+                        )}
+
+                        {/* Completed/approved/rejected badges — read-only */}
+                        {doneAssigned.length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            {doneAssigned.map(u => {
+                              const sc =
+                                u.doneStatus === 'approved'  ? 'bg-green-50 border-green-200 text-green-600' :
+                                u.doneStatus === 'rejected'  ? 'bg-red-50 border-red-200 text-red-500' :
+                                                               'bg-blue-50 border-blue-200 text-blue-500';
+                              const icon =
+                                u.doneStatus === 'approved'  ? '✓' :
+                                u.doneStatus === 'rejected'  ? '✕' : '⏳';
+                              const label =
+                                u.doneStatus === 'approved'  ? 'onaylandı' :
+                                u.doneStatus === 'rejected'  ? 'reddedildi' : 'tamamlandı';
+                              return (
+                                <span
+                                  key={u.id}
+                                  title={`${u.name} — ${label}`}
+                                  className={`inline-flex items-center gap-1 text-[11px] rounded-full pl-1.5 pr-2 py-0.5 font-medium border w-full select-none ${sc}`}
+                                >
+                                  <span className="leading-none shrink-0 opacity-60">{ROLE_ICON[u.role] ?? '👤'}</span>
+                                  <span className="truncate">{u.name}</span>
+                                  <span className="ml-auto text-[10px]">{icon}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
                         )}
 
                         {/* Assigned badges */}
@@ -975,7 +1039,7 @@ export default function AssignmentsPage() {
                     onChange={e => {
                       setCheckedSugs(prev => {
                         const next = new Set(prev);
-                        e.target.checked ? next.add(i) : next.delete(i);
+                        if (e.target.checked) { next.add(i); } else { next.delete(i); }
                         return next;
                       });
                     }}
