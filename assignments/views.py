@@ -1,18 +1,66 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.generics import GenericAPIView
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.conf import settings
 from django.db.models import Count, Sum, Q, F
 
 from users.permissions import IsManager, IsManagerOrSupervisor, IsSupervisor
-from .models import Assignment, TaskSubmission, RejectionLog
+from .models import Assignment, TaskSubmission, RejectionLog, ActivityLog
 from .serializers import (
     AssignmentSerializer, TaskSubmissionSerializer, SubmissionApprovalSerializer,
-    AuditEntrySerializer, RejectionLogSerializer,
+    AuditEntrySerializer, RejectionLogSerializer, ActivityLogSerializer,
 )
 from .utils import get_business_date
+
+
+def _optimize_image(upload, max_width=1080, quality=75):
+    """Resize + convert to WebP. Returns a ContentFile ready for django storage."""
+    import io
+    from PIL import Image
+    from django.core.files.base import ContentFile
+
+    img = Image.open(upload)
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    if img.width > max_width:
+        new_h = int((max_width / img.width) * img.height)
+        img = img.resize((max_width, new_h), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format='WEBP', quality=quality, optimize=True)
+    buf.seek(0)
+    return ContentFile(buf.read())
+
+
+class PhotoUploadView(GenericAPIView):
+    """Upload photo → optimize to WebP → save to R2 → return public URL."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        from uuid import uuid4
+        from django.core.files.storage import default_storage
+
+        file = request.FILES.get('photo')
+        if not file:
+            return Response({'error': 'Fotoğraf bulunamadı.'}, status=400)
+        if not getattr(file, 'content_type', '').startswith('image/'):
+            return Response({'error': 'Sadece resim dosyası yüklenebilir.'}, status=400)
+
+        try:
+            optimized = _optimize_image(file)
+        except Exception:
+            return Response({'error': 'Görsel işlenemedi.'}, status=400)
+
+        filename = f'submissions/{uuid4().hex}.webp'
+        saved = default_storage.save(filename, optimized)
+        url = default_storage.url(saved)
+        if not url.startswith('http'):
+            url = request.build_absolute_uri(url)
+
+        return Response({'url': url})
 
 
 class AssignmentSuggestView(GenericAPIView):
@@ -313,6 +361,20 @@ class PerformanceView(GenericAPIView):
             .values_list('user_id', 'n')
         )
 
+        # Feedback stats per user (feedbacks submitted BY each user, evaluated by manager)
+        from feedback.models import Feedback as FeedbackModel
+        user_ids = [row['user_id'] for row in agg]
+        fb_qs = FeedbackModel.objects.filter(user_id__in=user_ids)
+        if date_from:
+            fb_qs = fb_qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            fb_qs = fb_qs.filter(created_at__date__lte=date_to)
+        # Only count feedbacks that have received a manager response
+        fb_responded = fb_qs.filter(response__isnull=False)
+        fb_pos = dict(fb_responded.filter(response='positive').values('user_id').annotate(n=Count('id')).values_list('user_id', 'n'))
+        fb_neg = dict(fb_responded.filter(response='negative').values('user_id').annotate(n=Count('id')).values_list('user_id', 'n'))
+        fb_tot = dict(fb_responded.values('user_id').annotate(n=Count('id')).values_list('user_id', 'n'))
+
         results = []
         for row in agg:
             uid = row['user_id']
@@ -336,6 +398,12 @@ class PerformanceView(GenericAPIView):
             # avg submissions per completed task
             avg_submissions = round(total_subs / completed, 2) if completed > 0 else None
 
+            # feedback management rates
+            fb_positive = fb_pos.get(uid, 0)
+            fb_negative = fb_neg.get(uid, 0)
+            fb_total    = fb_tot.get(uid, 0)
+            fb_pos_rate = round(fb_positive / fb_total * 100, 1) if fb_total > 0 else None
+
             results.append({
                 'user_id': uid,
                 'user_name': row['user__name'],
@@ -352,6 +420,10 @@ class PerformanceView(GenericAPIView):
                 'redo_count': redo_count,
                 'total_submissions': total_subs,
                 'avg_submissions_per_task': avg_submissions,
+                'feedback_positive': fb_positive,
+                'feedback_negative': fb_negative,
+                'feedback_total': fb_total,
+                'feedback_pos_rate': fb_pos_rate,
             })
 
         return Response(results)
@@ -398,6 +470,37 @@ class AuditView(GenericAPIView):
 
         qs = qs[:200]
         return Response(AuditEntrySerializer(qs, many=True).data)
+
+
+class ActivityLogView(GenericAPIView):
+    """Manager/supervisor: filtrelenebilir etkinlik günlüğü."""
+    permission_classes = [IsAuthenticated, IsManagerOrSupervisor]
+
+    def get(self, request):
+        qs = ActivityLog.objects.select_related('actor', 'target_user', 'assignment')
+
+        action = request.query_params.get('action')
+        actor_id = request.query_params.get('actor_id')
+        user_id = request.query_params.get('user_id')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        business_date = request.query_params.get('business_date')
+
+        if action:
+            qs = qs.filter(action=action)
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+        if user_id:
+            qs = qs.filter(target_user_id=user_id)
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+        if business_date:
+            qs = qs.filter(business_date=business_date)
+
+        qs = qs[:300]
+        return Response(ActivityLogSerializer(qs, many=True).data)
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
@@ -459,7 +562,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             except (UserModel.DoesNotExist, TaskModel.DoesNotExist):
                 errors.append(f'Geçersiz kullanıcı ({user_id}) veya görev ({task_id}).')
                 continue
-            if task.allowed_genders and user.gender != task.allowed_genders:
+            # Managers bypass gender/role restrictions
+            if user.role != 'manager' and task.allowed_genders and user.gender != task.allowed_genders:
                 gender_label = 'erkek' if task.allowed_genders == 'male' else 'kadın'
                 errors.append(f'{user.name} → {task.title}: sadece {gender_label} personel atanabilir.')
                 continue
@@ -479,22 +583,44 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             return 1
 
         created_objs = []
+        from django.db import IntegrityError
         for vi in valid_items:
             task = vi['task']
             count = task_counts[task.id]
             coeff_share = round(task.coefficient / count, 2)
             times = get_times_per_day(task)
             for occ in range(1, times + 1):
-                a = Assignment.objects.create(
-                    user=vi['user'],
-                    task=task,
-                    zone_id=vi['zone_id'] or task.zone_id,
-                    date=date_str,
-                    occurrence=occ,
-                    coefficient_share=coeff_share,
-                    assigned_by=request.user,
-                )
-                created_objs.append(a)
+                try:
+                    a = Assignment.objects.create(
+                        user=vi['user'],
+                        task=task,
+                        zone_id=vi['zone_id'] or task.zone_id,
+                        date=date_str,
+                        occurrence=occ,
+                        coefficient_share=coeff_share,
+                        assigned_by=request.user,
+                    )
+                    created_objs.append(a)
+                except IntegrityError:
+                    errors.append(
+                        f'{vi["user"].name} → {task.title}: bu tarih için zaten atama mevcut (tamamlandı/onaylandı).'
+                    )
+
+        # Log one entry per assignment created
+        logs = []
+        for a in created_objs:
+            logs.append(ActivityLog(
+                actor=request.user,
+                actor_name=request.user.name,
+                action='bulk_assigned',
+                assignment=a,
+                target_user=a.user,
+                target_user_name=a.user.name,
+                task_title=a.task.title,
+                business_date=a.date,
+            ))
+        if logs:
+            ActivityLog.objects.bulk_create(logs)
 
         return Response({
             'created': len(created_objs),
@@ -537,7 +663,29 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return ctx
 
     def perform_create(self, serializer):
-        serializer.save(assigned_by=self.request.user)
+        a = serializer.save(assigned_by=self.request.user)
+        ActivityLog.objects.create(
+            actor=self.request.user,
+            actor_name=self.request.user.name,
+            action='assigned',
+            assignment=a,
+            target_user=a.user,
+            target_user_name=a.user.name,
+            task_title=a.task.title,
+            business_date=a.date,
+        )
+
+    def perform_destroy(self, instance):
+        ActivityLog.objects.create(
+            actor=self.request.user,
+            actor_name=self.request.user.name,
+            action='deleted',
+            target_user=instance.user,
+            target_user_name=instance.user.name,
+            task_title=instance.task.title,
+            business_date=instance.date,
+        )
+        instance.delete()
 
 
 class SubmissionViewSet(viewsets.ModelViewSet):
@@ -578,10 +726,19 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         submission = serializer.save()
-        # Mark the related assignment as completed
         assignment = submission.assignment
         assignment.status = 'completed'
         assignment.save(update_fields=['status'])
+        ActivityLog.objects.create(
+            actor=self.request.user,
+            actor_name=self.request.user.name,
+            action='completed',
+            assignment=assignment,
+            target_user=assignment.user,
+            target_user_name=assignment.user.name,
+            task_title=assignment.task.title,
+            business_date=assignment.date,
+        )
 
     @action(detail=True, methods=['put'])
     def approve(self, request, pk=None):
@@ -597,6 +754,17 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         submission.save()
         submission.assignment.status = 'approved'
         submission.assignment.save(update_fields=['status'])
+        ActivityLog.objects.create(
+            actor=request.user,
+            actor_name=request.user.name,
+            action='approved',
+            assignment=submission.assignment,
+            target_user=submission.assignment.user,
+            target_user_name=submission.assignment.user.name,
+            task_title=submission.assignment.task.title,
+            business_date=submission.assignment.date,
+            note=submission.note,
+        )
         return Response(TaskSubmissionSerializer(submission, context={'request': request}).data)
 
     @action(detail=True, methods=['put'])
@@ -615,7 +783,20 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             rejected_by=request.user,
             note=submission.note,
         )
-        # Return task to employee as pending so they can resubmit
-        submission.assignment.status = 'pending'
-        submission.assignment.save(update_fields=['status'])
+        ActivityLog.objects.create(
+            actor=request.user,
+            actor_name=request.user.name,
+            action='rejected',
+            assignment=submission.assignment,
+            target_user=submission.assignment.user,
+            target_user_name=submission.assignment.user.name,
+            task_title=submission.assignment.task.title,
+            business_date=submission.assignment.date,
+            note=submission.note,
+        )
+        # Return ALL assignees of this task+date to pending so everyone must redo
+        Assignment.objects.filter(
+            task=submission.assignment.task,
+            date=submission.assignment.date,
+        ).exclude(status='approved').update(status='pending')
         return Response(TaskSubmissionSerializer(submission, context={'request': request}).data)

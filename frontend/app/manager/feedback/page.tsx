@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Feedback, FeedbackCategory, FeedbackResponse } from '@/types';
 import * as svc from '@/services/feedback';
+import type { FeedbackStats, FeedbackPeriodStats } from '@/services/feedback';
 
 const CATEGORIES: { value: FeedbackCategory | 'all'; label: string; emoji: string }[] = [
   { value: 'all',       label: 'Tümü',      emoji: '📋' },
@@ -72,8 +73,26 @@ function RespondModal({ feedback, onClose, onDone }: RespondModalProps) {
         {/* Original feedback */}
         <div className="bg-gray-50 rounded-xl p-4 mb-5 text-sm text-gray-700">
           <p className="font-semibold text-gray-500 text-xs mb-1">{feedback.user_name} · {feedback.category_display}</p>
+          {feedback.customer_rating && (
+            <div className="flex items-center gap-0.5 mb-2">
+              {[1,2,3,4,5].map(s => (
+                <svg key={s} className={`w-4 h-4 ${s <= feedback.customer_rating! ? 'text-amber-400' : 'text-gray-300'}`} fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              ))}
+              <span className="ml-1 text-xs text-amber-600 font-semibold">Müşteri puanı: {feedback.customer_rating}/5</span>
+            </div>
+          )}
           <p className="leading-relaxed">{feedback.content}</p>
         </div>
+
+        {/* Process management label */}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          Süreç Yönetimi Değerlendirmesi
+        </p>
+        <p className="text-xs text-gray-400 mb-3">
+          Aşağıdaki değerlendirme müşteri puanını değil, süreç yönetiminin nasıl ele alındığını yansıtır.
+        </p>
 
         {/* Response buttons */}
         <div className="flex gap-3 mb-4">
@@ -162,6 +181,16 @@ function FeedbackCard({ fb, onRespond }: { fb: Feedback; onRespond: () => void }
         </div>
       </div>
 
+      {fb.customer_rating && (
+        <div className="flex items-center gap-0.5 mb-2">
+          {[1,2,3,4,5].map(s => (
+            <svg key={s} className={`w-4 h-4 ${s <= fb.customer_rating! ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          ))}
+          <span className="ml-1 text-xs text-amber-600 font-semibold">{fb.customer_rating}/5</span>
+        </div>
+      )}
       <p className="text-sm text-gray-700 leading-relaxed mb-3">{fb.content}</p>
 
       {/* Response note */}
@@ -179,16 +208,115 @@ function FeedbackCard({ fb, onRespond }: { fb: Feedback; onRespond: () => void }
   );
 }
 
+type Period = 'today' | 'week' | 'month' | 'overall';
+const PERIODS: { key: Period; label: string }[] = [
+  { key: 'today',   label: 'Günlük' },
+  { key: 'week',    label: 'Haftalık' },
+  { key: 'month',   label: 'Aylık' },
+  { key: 'overall', label: 'Genel' },
+];
+
+function StarRow({ avg, count }: { avg: number | null; count: number }) {
+  const filled = avg !== null ? Math.round(avg) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-0.5">
+        {[1,2,3,4,5].map(s => (
+          <svg key={s} className={`w-5 h-5 ${s <= filled ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        ))}
+      </div>
+      <span className="text-2xl font-extrabold text-gray-800">
+        {avg !== null ? avg.toFixed(1) : '—'}
+      </span>
+      <span className="text-sm text-gray-400">{count > 0 ? `${count} değerlendirme` : 'Henüz yok'}</span>
+    </div>
+  );
+}
+
+function PeriodTabs({ active, onChange }: { active: Period; onChange: (p: Period) => void }) {
+  return (
+    <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+      {PERIODS.map(p => (
+        <button
+          key={p.key}
+          onClick={() => onChange(p.key)}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            active === p.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PersonnelStatCards({ data }: { data: FeedbackPeriodStats['personnel'] }) {
+  const { positive, negative, pending, total } = data;
+  const posRate  = total > 0 ? Math.round((positive / total) * 100) : 0;
+  const negRate  = total > 0 ? Math.round((negative / total) * 100) : 0;
+  const pendRate = total > 0 ? Math.round((pending  / total) * 100) : 0;
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="bg-white rounded-2xl border border-emerald-100 p-4 flex items-center gap-3 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M7.493 18.75c-.425 0-.82-.236-.975-.632A7.48 7.48 0 016 15.375c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23h-.777zM2.331 10.977a11.969 11.969 0 00-.831 4.398 12 12 0 00.52 3.507c.26.85 1.084 1.368 1.973 1.368H4.9c.445 0 .72-.498.523-.898a8.963 8.963 0 01-.924-3.977c0-1.708.476-3.305 1.302-4.666.245-.403-.028-.959-.5-.959H4.25c-.832 0-1.612.453-1.918 1.227z"/>
+          </svg>
+        </div>
+        <div>
+          <div className="text-xl font-extrabold text-emerald-600">{posRate}%</div>
+          <div className="text-xs text-gray-500 font-medium">Olumlu <span className="text-gray-400">({positive})</span></div>
+          <div className="w-full bg-emerald-100 rounded-full h-1 mt-1.5"><div className="bg-emerald-500 h-1 rounded-full transition-all" style={{ width: `${posRate}%` }} /></div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-red-100 p-4 flex items-center gap-3 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M15.73 5.25h1.035A7.465 7.465 0 0118 9.375a7.465 7.465 0 01-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 01-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 00-.322 1.672V21a.75.75 0 01-.75.75 2.25 2.25 0 01-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 011.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 011.423.23l3.114 1.04a4.5 4.5 0 001.423.23zM21.669 13.773c.536-1.362.831-2.845.831-4.398 0-1.22-.182-2.398-.52-3.507-.26-.85-1.084-1.368-1.973-1.368H19.1c-.445 0-.72.498-.523.898.591 1.2.924 2.55.924 3.977a8.959 8.959 0 01-1.302 4.666c-.245.403.028.959.5.959h1.053c.832 0 1.612-.453 1.918-1.227z"/>
+          </svg>
+        </div>
+        <div>
+          <div className="text-xl font-extrabold text-red-500">{negRate}%</div>
+          <div className="text-xs text-gray-500 font-medium">Olumsuz <span className="text-gray-400">({negative})</span></div>
+          <div className="w-full bg-red-100 rounded-full h-1 mt-1.5"><div className="bg-red-500 h-1 rounded-full transition-all" style={{ width: `${negRate}%` }} /></div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-amber-100 p-4 flex items-center gap-3 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div>
+          <div className="text-xl font-extrabold text-amber-500">{pendRate}%</div>
+          <div className="text-xs text-gray-500 font-medium">Bekliyor <span className="text-gray-400">({pending})</span></div>
+          <div className="w-full bg-amber-100 rounded-full h-1 mt-1.5"><div className="bg-amber-400 h-1 rounded-full transition-all" style={{ width: `${pendRate}%` }} /></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FeedbackPage() {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [responseFilter, setResponseFilter] = useState<string>('all');
   const [respondTarget, setRespondTarget] = useState<Feedback | null>(null);
+  const [customerPeriod, setCustomerPeriod] = useState<Period>('today');
+  const [personnelPeriod, setPersonnelPeriod] = useState<Period>('today');
 
-  useEffect(() => { load(); }, [categoryFilter, responseFilter]);
+  useEffect(() => {
+    svc.getFeedbackStats().then(setStats).catch(() => {});
+  }, []);
 
-  async function load() {
+  useEffect(() => { loadList(); }, [categoryFilter, responseFilter]);
+
+  async function loadList() {
     setLoading(true);
     try {
       const params: Record<string, string> = {};
@@ -201,75 +329,61 @@ export default function FeedbackPage() {
   function handleResponded(updated: Feedback) {
     setFeedbacks(prev => prev.map(f => f.id === updated.id ? updated : f));
     setRespondTarget(null);
+    svc.getFeedbackStats().then(setStats).catch(() => {});
   }
 
-  const total    = feedbacks.length;
-  const positive = feedbacks.filter(f => f.response === 'positive').length;
-  const negative = feedbacks.filter(f => f.response === 'negative').length;
-  const pending  = feedbacks.filter(f => !f.response).length;
-  const posRate  = total > 0 ? Math.round((positive / total) * 100) : 0;
-  const negRate  = total > 0 ? Math.round((negative / total) * 100) : 0;
-  const pendRate = total > 0 ? Math.round((pending  / total) * 100) : 0;
+  const customerData = stats?.[customerPeriod]?.customer ?? null;
+  const personnelData = stats?.[personnelPeriod]?.personnel ?? null;
+  const totalListCount = feedbacks.length;
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] px-4 py-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Geri Bildirimler</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{total} geri bildirim</p>
-        </div>
+      {/* Page header */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Geri Bildirimler</h1>
       </div>
 
-      {/* Stats */}
-      {total > 0 && (
-        <div className="grid grid-cols-3 gap-4 mb-7">
-          <div className="bg-white rounded-2xl border border-emerald-100 p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M7.493 18.75c-.425 0-.82-.236-.975-.632A7.48 7.48 0 016 15.375c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23h-.777zM2.331 10.977a11.969 11.969 0 00-.831 4.398 12 12 0 00.52 3.507c.26.85 1.084 1.368 1.973 1.368H4.9c.445 0 .72-.498.523-.898a8.963 8.963 0 01-.924-3.977c0-1.708.476-3.305 1.302-4.666.245-.403-.028-.959-.5-.959H4.25c-.832 0-1.612.453-1.918 1.227z"/>
-              </svg>
-            </div>
-            <div>
-              <div className="text-2xl font-extrabold text-emerald-600">{posRate}%</div>
-              <div className="text-xs text-gray-500 font-medium">Olumlu <span className="text-gray-400">({positive})</span></div>
-              <div className="w-full bg-emerald-100 rounded-full h-1 mt-1.5">
-                <div className="bg-emerald-500 h-1 rounded-full transition-all" style={{ width: `${posRate}%` }} />
-              </div>
-            </div>
+      {/* ── Müşteri Değerlendirmeleri ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Müşteri Değerlendirmeleri</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Müşterilerden gelen yıldız puanı ortalaması</p>
           </div>
-
-          <div className="bg-white rounded-2xl border border-red-100 p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M15.73 5.25h1.035A7.465 7.465 0 0118 9.375a7.465 7.465 0 01-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 01-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 00-.322 1.672V21a.75.75 0 01-.75.75 2.25 2.25 0 01-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 011.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 011.423.23l3.114 1.04a4.5 4.5 0 001.423.23zM21.669 13.773c.536-1.362.831-2.845.831-4.398 0-1.22-.182-2.398-.52-3.507-.26-.85-1.084-1.368-1.973-1.368H19.1c-.445 0-.72.498-.523.898.591 1.2.924 2.55.924 3.977a8.959 8.959 0 01-1.302 4.666c-.245.403.028.959.5.959h1.053c.832 0 1.612-.453 1.918-1.227z"/>
-              </svg>
-            </div>
-            <div>
-              <div className="text-2xl font-extrabold text-red-500">{negRate}%</div>
-              <div className="text-xs text-gray-500 font-medium">Olumsuz <span className="text-gray-400">({negative})</span></div>
-              <div className="w-full bg-red-100 rounded-full h-1 mt-1.5">
-                <div className="bg-red-500 h-1 rounded-full transition-all" style={{ width: `${negRate}%` }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-amber-100 p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <div>
-              <div className="text-2xl font-extrabold text-amber-500">{pendRate}%</div>
-              <div className="text-xs text-gray-500 font-medium">Bekliyor <span className="text-gray-400">({pending})</span></div>
-              <div className="w-full bg-amber-100 rounded-full h-1 mt-1.5">
-                <div className="bg-amber-400 h-1 rounded-full transition-all" style={{ width: `${pendRate}%` }} />
-              </div>
-            </div>
-          </div>
+          <PeriodTabs active={customerPeriod} onChange={setCustomerPeriod} />
         </div>
-      )}
+        {customerData ? (
+          <StarRow avg={customerData.avg} count={customerData.count} />
+        ) : (
+          <div className="h-8 flex items-center">
+            <div className="animate-pulse w-40 h-6 bg-gray-100 rounded" />
+          </div>
+        )}
+      </div>
+
+      {/* ── Personel Feedback Yönetimi ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Personel Feedback Yönetimi</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Süreç değerlendirme oranları</p>
+          </div>
+          <PeriodTabs active={personnelPeriod} onChange={setPersonnelPeriod} />
+        </div>
+        {personnelData ? (
+          <PersonnelStatCards data={personnelData} />
+        ) : (
+          <div className="h-20 flex items-center">
+            <div className="animate-pulse w-full h-16 bg-gray-100 rounded-2xl" />
+          </div>
+        )}
+      </div>
+
+      {/* ── Feedback listesi ── */}
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Tüm Geri Bildirimler</h3>
+        <span className="text-xs text-gray-400">({totalListCount})</span>
+      </div>
 
       {/* Category filter */}
       <div className="flex gap-2 flex-wrap mb-3">
