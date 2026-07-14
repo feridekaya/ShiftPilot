@@ -74,6 +74,7 @@ export interface UserPerformance {
   feedback_negative: number;
   feedback_total: number;
   feedback_pos_rate: number | null;
+  is_active: boolean;
 }
 
 export async function getStoreAssignments(): Promise<Assignment[]> {

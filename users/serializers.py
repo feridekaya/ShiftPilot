@@ -5,7 +5,17 @@ from .models import User
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        data = super().validate(attrs)
+        try:
+            data = super().validate(attrs)
+        except Exception as exc:
+            # If the credentials belong to an inactive user, give a clear message
+            email = attrs.get(self.username_field, '')
+            if email and User.objects.filter(email=email, is_active=False).exists():
+                from rest_framework_simplejwt.exceptions import AuthenticationFailed
+                raise AuthenticationFailed(
+                    'Hesabınız askıya alındı. Yetkili ile iletişime geçin.'
+                ) from exc
+            raise
         data['id'] = self.user.id
         data['name'] = self.user.name
         data['role'] = self.user.role

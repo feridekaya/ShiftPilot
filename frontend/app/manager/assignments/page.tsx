@@ -154,10 +154,14 @@ export default function AssignmentsPage() {
     });
   }, []);
 
-  // ── Load plan when date changes ─────────────────────────────────────────────
+  // ── Load plan + daily schedule when date changes ───────────────────────────
   useEffect(() => {
     if (loading) return;
     setPlanLoading(true);
+    // Also load schedule for the week containing this date (for offday filtering)
+    scheduleService.getWeekSchedules(toISO(getMonday(date))).then(scheds => {
+      setWeekSchedules(scheds);
+    });
     assignmentService.getAssignments({ date: toISO(date) }).then(assignments => {
       // permanent plan always reflects the task's permanent_assignees definition
       const permPlan: PermanentPlan = {};
@@ -773,36 +777,50 @@ export default function AssignmentsPage() {
           onDragOver={e => e.preventDefault()}
           onDrop={onPoolDrop}
         >
-          <div className="px-3 py-2.5 border-b border-gray-100 bg-gray-50">
-            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Personel</p>
-            <p className="text-[10px] text-gray-400">{employees.length} aktif</p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
-            {employees.map(u => {
-              const assigned = isAssigned(u.id);
-              return (
-                <div
-                  key={u.id}
-                  draggable
-                  onDragStart={e => onDragStart(e, u.id, null)}
-                  onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
-                  className={`
-                    px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
-                    border text-xs font-medium transition-all
-                    ${assigned
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}
-                  `}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
-                    <span className="truncate">{u.name}</span>
-                  </div>
-                  {assigned && <div className="text-[9px] text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
+          {(() => {
+            const offDayIds = new Set(
+              weekSchedules.filter(s => s.date === toISO(date) && s.is_off).map(s => s.user_id)
+            );
+            const available = employees.filter(u => !offDayIds.has(u.id));
+            const poolList = available.length > 0 ? available : employees;
+            const someHidden = available.length < employees.length && available.length > 0;
+            return (
+              <>
+                <div className="px-3 py-2.5 border-b border-gray-100 bg-gray-50">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Personel</p>
+                  <p className="text-[10px] text-gray-400">
+                    {poolList.length} kişi{someHidden && ` · ${offDayIds.size} izinli gizlendi`}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
+                  {poolList.map(u => {
+                    const assigned = isAssigned(u.id);
+                    return (
+                      <div
+                        key={u.id}
+                        draggable
+                        onDragStart={e => onDragStart(e, u.id, null)}
+                        onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
+                        className={`
+                          px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
+                          border text-xs font-medium transition-all
+                          ${assigned
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}
+                        `}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
+                          <span className="truncate">{u.name}</span>
+                        </div>
+                        {assigned && <div className="text-[9px] text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* ── Task Board ── */}

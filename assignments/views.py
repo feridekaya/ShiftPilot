@@ -364,6 +364,11 @@ class PerformanceView(GenericAPIView):
         # Feedback stats per user (feedbacks submitted BY each user, evaluated by manager)
         from feedback.models import Feedback as FeedbackModel
         user_ids = [row['user_id'] for row in agg]
+
+        # is_active map for filtering on frontend
+        user_active_map = dict(
+            UserModel.objects.filter(id__in=user_ids).values_list('id', 'is_active')
+        )
         fb_qs = FeedbackModel.objects.filter(user_id__in=user_ids)
         if date_from:
             fb_qs = fb_qs.filter(created_at__date__gte=date_from)
@@ -424,6 +429,7 @@ class PerformanceView(GenericAPIView):
                 'feedback_negative': fb_negative,
                 'feedback_total': fb_total,
                 'feedback_pos_rate': fb_pos_rate,
+                'is_active': user_active_map.get(uid, True),
             })
 
         return Response(results)
