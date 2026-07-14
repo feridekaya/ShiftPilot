@@ -769,11 +769,11 @@ export default function AssignmentsPage() {
       )}
 
       {/* ── Main layout (daily) ── */}
-      {viewMode === 'daily' && <div className="flex gap-4 flex-1 min-h-0">
+      {viewMode === 'daily' && <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
 
         {/* ── Staff Pool ── */}
         <div
-          className="w-48 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden self-start sticky top-0 max-h-[calc(100vh-160px)]"
+          className="w-full md:w-48 md:flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden md:self-start md:sticky md:top-0 md:max-h-[calc(100vh-160px)]"
           onDragOver={e => e.preventDefault()}
           onDrop={onPoolDrop}
         >
@@ -792,7 +792,8 @@ export default function AssignmentsPage() {
                     {poolList.length} kişi{someHidden && ` · ${offDayIds.size} izinli gizlendi`}
                   </p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
+                {/* Mobile: horizontal scroll; Desktop: vertical list */}
+                <div className="overflow-x-auto md:overflow-x-visible p-2 flex flex-row md:flex-col gap-1.5 md:flex-1 md:overflow-y-auto">
                   {poolList.map(u => {
                     const assigned = isAssigned(u.id);
                     return (
@@ -802,7 +803,7 @@ export default function AssignmentsPage() {
                         onDragStart={e => onDragStart(e, u.id, null)}
                         onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
                         className={`
-                          px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
+                          flex-shrink-0 px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
                           border text-xs font-medium transition-all
                           ${assigned
                             ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
@@ -811,7 +812,7 @@ export default function AssignmentsPage() {
                       >
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
-                          <span className="truncate">{u.name}</span>
+                          <span className="whitespace-nowrap">{u.name}</span>
                         </div>
                         {assigned && <div className="text-[9px] text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
                       </div>

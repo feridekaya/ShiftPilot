@@ -290,16 +290,18 @@ export default function SchedulePage() {
           <h1 className="text-xl font-bold">Haftalık Çizelge</h1>
           <p className="text-sm text-gray-500 mt-0.5">{weekLabel(monday)}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {dirty && (
             <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
               Kaydedilmemiş değişiklikler
             </span>
           )}
-          <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, -7)))}>← Önceki</Button>
-          <Button variant="secondary" size="sm" onClick={() => setMonday(getMonday(new Date()))}>Bu Hafta</Button>
-          <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, 7)))}>Sonraki →</Button>
-          <Button variant="secondary" size="sm" onClick={copyPreviousWeek}>↩ Geçen Haftayı Getir</Button>
+          <div className="flex items-center gap-1">
+            <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, -7)))}>←</Button>
+            <Button variant="secondary" size="sm" onClick={() => setMonday(getMonday(new Date()))}>Bu Hafta</Button>
+            <Button variant="secondary" size="sm" onClick={() => setMonday(m => getMonday(addDays(m, 7)))}>→</Button>
+          </div>
+          <Button variant="secondary" size="sm" onClick={copyPreviousWeek}>↩ Geçen Hafta</Button>
           <Button variant="secondary" size="sm" onClick={handleExport}>⬇ Excel</Button>
           <Button size="sm" isLoading={saving} onClick={handleSave}>
             {dirty ? 'Kaydet ●' : 'Kaydet'}
