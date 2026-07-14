@@ -100,6 +100,7 @@ export default function PerformancePage() {
   const roles = ['all', 'manager', 'supervisor', 'employee'];
 
   const sorted = [...data]
+    .filter(r => r.is_active !== false)
     .filter(r => roleFilter === 'all' || r.user_role === roleFilter)
     .sort((a, b) => {
       const av = a[sortKey] ?? -1;

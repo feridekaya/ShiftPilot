@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { AxiosError } from 'axios';
@@ -25,12 +27,18 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      const axiosErr = err as AxiosError<Record<string, string[]>>;
-      const detail =
+      const axiosErr = err as AxiosError<Record<string, string | string[]>>;
+      const raw =
         axiosErr.response?.data?.detail ??
         axiosErr.response?.data?.non_field_errors?.[0] ??
         'E-posta veya şifre hatalı.';
-      setError(String(detail));
+      const detail = String(raw);
+      // Detect inactive account (backend returns Turkish, but guard against English fallback too)
+      if (detail.toLowerCase().includes('no active account') || detail.includes('askıya')) {
+        setError('Hesabınız askıya alındı. Yetkili ile iletişime geçin.');
+      } else {
+        setError(detail);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -38,62 +46,62 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 px-16 py-14">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-          <span className="text-white font-bold text-xl tracking-tight">ShiftPilot</span>
-        </div>
 
-        {/* Center content */}
-        <div>
-          <h1 className="text-4xl font-extrabold text-white leading-tight mb-5">
+      {/* Sol panel — sadece logo ve slogan, ortalanmış */}
+      <div className="hidden lg:flex flex-col items-center justify-center w-1/2 px-16 py-14 gap-10">
+        <Image
+          src="/logos/logo-dark.png"
+          alt="ShiftPilot"
+          width={360}
+          height={140}
+          className="w-72 h-auto object-contain"
+          priority
+        />
+
+        <div className="text-center">
+          <h1 className="text-3xl font-extrabold text-white leading-snug mb-4">
             Vardiyayı Yöneten<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-300">
               Akıllı Operasyon
             </span>
           </h1>
-          <p className="text-slate-400 text-lg leading-relaxed max-w-md mb-10">
+          <p className="text-slate-400 text-base leading-relaxed max-w-xs mx-auto">
             Görev atama, fotoğraflı tamamlama ve performans takibini tek ekranda yönetin.
           </p>
-          <div className="flex flex-col gap-4">
-            {[
-              { icon: '📋', text: 'Vardiya bazlı görev atama' },
-              { icon: '📸', text: 'Kamera ile anlık tamamlama kanıtı' },
-              { icon: '📊', text: 'Gerçek zamanlı denetim ve performans' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-base">
-                  {item.icon}
-                </div>
-                <span className="text-slate-300 text-sm">{item.text}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <p className="text-slate-600 text-xs">© 2026 ShiftPilot. Tüm hakları saklıdır.</p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          {[
+            { icon: '📋', text: 'Vardiya bazlı görev atama' },
+            { icon: '📸', text: 'Kamera ile anlık tamamlama kanıtı' },
+            { icon: '📊', text: 'Gerçek zamanlı denetim ve performans' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5 border border-white/10">
+              <span className="text-base">{item.icon}</span>
+              <span className="text-slate-300 text-sm">{item.text}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-slate-600 text-xs mt-auto">© 2026 ShiftPilot. Tüm hakları saklıdır.</p>
       </div>
 
-      {/* Right panel — form */}
+      {/* Sağ panel — form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg">ShiftPilot</span>
+
+          {/* Mobil logo — ortalanmış ve büyük */}
+          <div className="mb-10 lg:hidden flex justify-center">
+            <Image
+              src="/logos/logo-dark.png"
+              alt="ShiftPilot"
+              width={220}
+              height={80}
+              className="w-44 h-auto object-contain"
+              priority
+            />
           </div>
 
-          {/* Card */}
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-white mb-1.5">Hoş geldiniz</h2>
@@ -110,7 +118,6 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">E-posta</label>
                 <div className="relative">
@@ -131,7 +138,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Şifre</label>
                 <div className="relative">
@@ -168,7 +174,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Submit */}
+              <div className="flex justify-end -mt-2">
+                <Link href="/forgot-password" className="text-slate-400 hover:text-slate-200 text-xs transition-colors">
+                  Şifremi Unuttum
+                </Link>
+              </div>
+
               <button
                 type="submit"
                 disabled={submitting}
