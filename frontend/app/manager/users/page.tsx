@@ -150,8 +150,8 @@ export default function UsersPage() {
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} kullanıcı</span>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
             <tr>
               <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-900" onClick={() => handleSort('name')}>

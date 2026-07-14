@@ -247,8 +247,8 @@ export default function ManagerBreaksPage() {
                 Bu tarihte mola kaydı yok
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-100 shadow overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-xl border border-gray-100 shadow overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm min-w-[480px]">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
                     <tr>
                       <th className="px-4 py-3 text-left">Personel</th>

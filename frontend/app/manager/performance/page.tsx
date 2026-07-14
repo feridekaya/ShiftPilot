@@ -141,7 +141,7 @@ export default function PerformancePage() {
         </div>
 
         {/* Date range */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
             value={dateFrom}

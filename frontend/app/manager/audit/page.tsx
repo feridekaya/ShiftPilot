@@ -248,8 +248,8 @@ export default function AuditPage() {
       ) : entries.length === 0 ? (
         <div className="text-center py-20 text-gray-400">Bu filtreye ait kayıt bulunamadı.</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-gray-800 text-white text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">Zaman</th>
