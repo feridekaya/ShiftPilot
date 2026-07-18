@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { User, Task, TaskCategory, TaskSchedule, Assignment } from '@/types';
@@ -43,12 +43,13 @@ const CATEGORY_LABELS: Record<TaskCategory, string> = {
 
 const CATEGORY_STYLE: Record<TaskCategory, {
   border: string; bg: string; header: string; dropOver: string;
+  darkBorder: string; darkBg: string; darkHeader: string;
 }> = {
-  opening:        { border: 'border-amber-300',  bg: 'bg-amber-50/60',  header: 'bg-amber-100 text-amber-800',    dropOver: 'ring-2 ring-amber-400 bg-amber-100' },
-  closing:        { border: 'border-purple-300', bg: 'bg-purple-50/60', header: 'bg-purple-100 text-purple-800',  dropOver: 'ring-2 ring-purple-400 bg-purple-100' },
-  responsibility: { border: 'border-blue-300',   bg: 'bg-blue-50/60',   header: 'bg-blue-100 text-blue-800',      dropOver: 'ring-2 ring-blue-400 bg-blue-100' },
-  general:        { border: 'border-gray-300',   bg: 'bg-gray-50/60',   header: 'bg-gray-100 text-gray-700',      dropOver: 'ring-2 ring-gray-400 bg-gray-100' },
-  special:        { border: 'border-rose-300',   bg: 'bg-rose-50/60',   header: 'bg-rose-100 text-rose-800',      dropOver: 'ring-2 ring-rose-400 bg-rose-100' },
+  opening:        { border: 'border-amber-300',  bg: 'bg-amber-50/60',  header: 'bg-amber-100 text-amber-800',   dropOver: 'ring-2 ring-amber-400 bg-amber-100',  darkBorder: 'dark:border-amber-600/50',  darkBg: 'dark:bg-amber-900/20',  darkHeader: 'dark:bg-amber-900/30 dark:text-amber-300'   },
+  closing:        { border: 'border-purple-300', bg: 'bg-purple-50/60', header: 'bg-purple-100 text-purple-800', dropOver: 'ring-2 ring-purple-400 bg-purple-100', darkBorder: 'dark:border-purple-600/50', darkBg: 'dark:bg-purple-900/20', darkHeader: 'dark:bg-purple-900/30 dark:text-purple-300' },
+  responsibility: { border: 'border-blue-300',   bg: 'bg-blue-50/60',   header: 'bg-blue-100 text-blue-800',     dropOver: 'ring-2 ring-blue-400 bg-blue-100',    darkBorder: 'dark:border-blue-600/50',   darkBg: 'dark:bg-blue-900/20',   darkHeader: 'dark:bg-blue-900/30 dark:text-blue-300'     },
+  general:        { border: 'border-gray-300',   bg: 'bg-gray-50/60',   header: 'bg-gray-100 text-gray-700',     dropOver: 'ring-2 ring-gray-400 bg-gray-100',    darkBorder: 'dark:border-slate-600/50',  darkBg: 'dark:bg-[#162543]/60',  darkHeader: 'dark:bg-[#162543] dark:text-slate-300'      },
+  special:        { border: 'border-rose-300',   bg: 'bg-rose-50/60',   header: 'bg-rose-100 text-rose-800',     dropOver: 'ring-2 ring-rose-400 bg-rose-100',    darkBorder: 'dark:border-rose-600/50',   darkBg: 'dark:bg-rose-900/20',   darkHeader: 'dark:bg-rose-900/30 dark:text-rose-300'     },
 };
 
 const CATEGORY_ORDER: TaskCategory[] = ['opening', 'closing', 'responsibility', 'general', 'special'];
@@ -132,10 +133,13 @@ export default function AssignmentsPage() {
   const dragSourceId = useRef<number | null>(null); // null = from pool
   const [dragOverId, setDragOverId] = useState<number | null>(null);
 
+  // Mobile tap-to-assign
+  const [selectedForAssign, setSelectedForAssign] = useState<number | null>(null);
+
   // ── Load static data once ───────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([userService.getUsers(), taskService.getTasks()]).then(([users, allTasks]) => {
-      setEmployees(users.filter(u => u.is_active));
+      setEmployees(users.filter(u => u.is_active && u.role !== 'manager'));
       setTasks(allTasks);
       setLoading(false);
     });
@@ -434,8 +438,9 @@ export default function AssignmentsPage() {
 
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
-        <h1 className="text-xl font-bold whitespace-nowrap">
-          {viewMode === 'daily' ? 'Günlük Operasyon Paneli' : 'Haftalık Atama Tablosu'}
+        <h1 className="text-base sm:text-xl font-bold whitespace-nowrap">
+          <span className="hidden sm:inline">{viewMode === 'daily' ? 'Günlük Operasyon Paneli' : 'Haftalık Atama Tablosu'}</span>
+          <span className="sm:hidden">{viewMode === 'daily' ? 'Operasyon' : 'Haftalık'}</span>
         </h1>
 
         <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
@@ -446,15 +451,15 @@ export default function AssignmentsPage() {
         {viewMode === 'daily' ? (
           <div className="flex items-center gap-1">
             <button onClick={() => setDate(d => addDays(d, -1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">←</button>
-            <span className="px-3 py-1.5 text-sm font-semibold bg-white border border-gray-200 rounded-lg min-w-[180px] text-center">{dateLabel(date)}</span>
+            <span className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white dark:bg-[#111E38] dark:text-white border border-gray-200 dark:border-[#1E293B] rounded-lg text-center">{dateLabel(date)}</span>
             <button onClick={() => setDate(d => addDays(d, 1))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">→</button>
             <button onClick={() => setDate(new Date())} className="ml-1 px-2 py-1 text-xs rounded hover:bg-gray-100 text-gray-500 border border-gray-200">Bugün</button>
-            <input type="date" value={toISO(date)} onChange={e => e.target.value && setDate(fromISO(e.target.value))} className="ml-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-600" />
+            <input type="date" value={toISO(date)} onChange={e => e.target.value && setDate(fromISO(e.target.value))} className="hidden md:block ml-1 border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-600 dark:text-white rounded px-2 py-1 text-xs" />
           </div>
         ) : (
           <div className="flex items-center gap-1">
             <button onClick={() => setWeekMonday(m => getMonday(addDays(m, -7)))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">←</button>
-            <span className="px-3 py-1.5 text-sm font-semibold bg-white border border-gray-200 rounded-lg min-w-[210px] text-center">
+            <span className="px-3 py-1.5 text-sm font-semibold bg-white dark:bg-[#111E38] dark:text-white border border-gray-200 dark:border-[#1E293B] rounded-lg min-w-[210px] text-center">
               {weekMonday.getDate()} {TR_MONTHS_SHORT[weekMonday.getMonth()]} – {weekEndSunday.getDate()} {TR_MONTHS_SHORT[weekEndSunday.getMonth()]} {weekEndSunday.getFullYear()}
             </span>
             <button onClick={() => setWeekMonday(m => getMonday(addDays(m, 7)))} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 text-lg">→</button>
@@ -462,13 +467,16 @@ export default function AssignmentsPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto">
           {viewMode === 'daily' ? (
             <>
-              {dirty && <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">Kaydedilmemiş</span>}
-              <Button variant="secondary" size="sm" isLoading={copying} onClick={copyPreviousDay}>↩ Dünü Kopyala</Button>
+              {dirty && <span className="order-first sm:order-none w-full sm:w-auto text-center sm:text-left text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">Kaydedilmemiş</span>}
+              <Button variant="secondary" size="sm" isLoading={copying} onClick={copyPreviousDay}>
+                <span className="hidden sm:inline">↩ Dünü Kopyala</span>
+                <span className="sm:hidden">↩ Dün</span>
+              </Button>
               <Button variant="secondary" size="sm" onClick={handleExport}>⬇ Excel</Button>
-              <Button size="sm" isLoading={saving} onClick={handleSave}>{dirty ? 'Kaydet ●' : 'Kaydet'}</Button>
+              <Button size="sm" isLoading={saving} onClick={handleSave} className="ml-auto sm:ml-0">{dirty ? 'Kaydet ●' : 'Kaydet'}</Button>
             </>
           ) : (
             <>
@@ -622,40 +630,45 @@ export default function AssignmentsPage() {
       )}
 
       {/* ── Main layout (daily) ── */}
-      {viewMode === 'daily' && <div className="flex gap-4 flex-1 min-h-0">
+      {viewMode === 'daily' && <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
 
         {/* ── Staff Pool ── */}
         <div
-          className="w-48 flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden self-start sticky top-0 max-h-[calc(100vh-160px)]"
+          className="w-full md:w-48 md:flex-shrink-0 flex flex-col bg-white dark:bg-[#111E38] rounded-xl border border-gray-200 dark:border-[#1E293B] shadow-sm overflow-hidden md:self-start md:sticky md:top-0 md:max-h-[calc(100vh-160px)]"
           onDragOver={e => e.preventDefault()}
           onDrop={onPoolDrop}
         >
-          <div className="px-3 py-2.5 border-b border-gray-100 bg-gray-50">
-            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Personel</p>
-            <p className="text-[10px] text-gray-400">{employees.length} aktif</p>
+          <div className="px-3 py-2.5 border-b border-gray-100 dark:border-[#1E293B] bg-gray-50 dark:bg-[#162543]">
+            <p className="text-[11px] font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Personel</p>
+            <p className="text-[10px] text-gray-400 dark:text-slate-400">{employees.length} aktif</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
+          <div className="overflow-x-auto md:overflow-x-visible p-2 flex flex-row md:flex-col gap-1.5 md:flex-1 md:overflow-y-auto">
             {employees.map(u => {
               const assigned = isAssigned(u.id);
+              const isSelected = selectedForAssign === u.id;
               return (
                 <div
                   key={u.id}
                   draggable
                   onDragStart={e => onDragStart(e, u.id, null)}
                   onDragEnd={() => { dragUserId.current = dragSourceId.current = null; setDragOverId(null); }}
+                  onClick={() => setSelectedForAssign(isSelected ? null : u.id)}
                   className={`
-                    px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none
+                    flex-shrink-0 px-2.5 py-2 rounded-lg cursor-pointer select-none
                     border text-xs font-medium transition-all
-                    ${assigned
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}
+                    ${isSelected
+                      ? 'bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                      : assigned
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-700 dark:text-indigo-300'
+                        : 'bg-white dark:bg-[#162543] border-gray-200 dark:border-[#1E293B] text-gray-700 dark:text-slate-200 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-[#192d4a]'}
                   `}
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm leading-none">{ROLE_ICON[u.role] ?? '👤'}</span>
-                    <span className="truncate">{u.name}</span>
+                    <span className="whitespace-nowrap">{u.name}</span>
                   </div>
-                  {assigned && <div className="text-[9px] text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
+                  {isSelected && <div className="text-[9px] text-indigo-200 mt-0.5 pl-5">seçildi — göreve dokun</div>}
+                  {!isSelected && assigned && <div className="text-[9px] text-indigo-400 dark:text-indigo-400 mt-0.5 pl-5">atanmış ✓</div>}
                 </div>
               );
             })}
@@ -664,6 +677,16 @@ export default function AssignmentsPage() {
 
         {/* ── Task Board ── */}
         <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1 pb-4">
+          {/* Mobile selection banner */}
+          {selectedForAssign !== null && (
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm">
+              <span className="font-medium">
+                👤 {employees.find(u => u.id === selectedForAssign)?.name} seçildi — göreve dokun
+              </span>
+              <button onClick={() => setSelectedForAssign(null)} className="text-indigo-200 hover:text-white text-lg leading-none">✕</button>
+            </div>
+          )}
+
           {planLoading && (
             <div className="flex justify-center py-10"><Spinner size="lg" /></div>
           )}
@@ -672,9 +695,9 @@ export default function AssignmentsPage() {
             if (!catTasks || catTasks.length === 0) return null;
             const sty = CATEGORY_STYLE[cat];
             return (
-              <section key={cat} className={`rounded-xl border-2 ${sty.border} flex-shrink-0`}>
+              <section key={cat} className={`rounded-xl border-2 ${sty.border} ${sty.darkBorder} flex-shrink-0`}>
                 {/* Category header */}
-                <div className={`px-4 py-2 ${sty.header} flex items-center justify-between`}>
+                <div className={`px-4 py-2 ${sty.header} ${sty.darkHeader} flex items-center justify-between`}>
                   <span className="text-sm font-bold tracking-wide">{CATEGORY_LABELS[cat]}</span>
                   <span className="text-xs opacity-60">{catTasks.length} görev</span>
                 </div>
@@ -693,43 +716,49 @@ export default function AssignmentsPage() {
                         key={task.id}
                         className={`
                           rounded-lg border-2 p-2.5 flex flex-col gap-2 transition-all
-                          ${isOver ? sty.dropOver : `${sty.border} ${sty.bg}`}
+                          ${isOver ? sty.dropOver : `${sty.border} ${sty.darkBorder} ${sty.bg} ${sty.darkBg}`}
+                          ${selectedForAssign !== null ? 'cursor-pointer' : ''}
                         `}
                         onDragOver={e => onTaskDragOver(e, task.id)}
                         onDragLeave={() => setDragOverId(null)}
                         onDrop={e => onTaskDrop(e, task.id)}
+                        onClick={() => {
+                          if (selectedForAssign === null) return;
+                          addToTask(selectedForAssign, task.id);
+                          setSelectedForAssign(null);
+                        }}
                       >
                         {/* Task name + zone + coefficient */}
                         <div className="flex items-start justify-between gap-1">
                           <button
-                            className="text-xs font-semibold text-gray-800 leading-snug text-left hover:text-indigo-700 transition-colors min-w-0 break-words"
+                            className="text-xs font-semibold text-gray-800 dark:text-slate-100 leading-snug text-left hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors min-w-0 break-words"
                             title={task.description || undefined}
-                            onClick={() => task.description && setExpandedDescs(e => ({ ...e, [task.id]: !e[task.id] }))}
+                            onClick={e => { e.stopPropagation(); task.description && setExpandedDescs(prev => ({ ...prev, [task.id]: !prev[task.id] })); }}
                           >
                             {task.title}
                             {task.description && (
-                              <span className="ml-1 text-[9px] text-gray-400 font-normal">
+                              <span className="ml-1 text-[9px] text-gray-400 dark:text-slate-500 font-normal">
                                 {expandedDescs[task.id] ? '▲' : '▼'}
                               </span>
                             )}
                           </button>
                           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                             {task.zone && (
-                              <span className="text-[9px] text-gray-400">{task.zone.name}</span>
+                              <span className="text-[9px] text-gray-400 dark:text-slate-400">{task.zone.name}</span>
                             )}
                             {coeffShare ? (
-                              <span className="text-[9px] text-indigo-500 font-medium">
+                              <span className="text-[9px] text-indigo-500 dark:text-indigo-400 font-medium">
                                 k:{coeffShare}×{assigneeCount}
                               </span>
                             ) : task.coefficient > 1 ? (
-                              <span className="text-[9px] text-gray-400">k:{task.coefficient}</span>
+                              <span className="text-[9px] text-gray-400 dark:text-slate-400">k:{task.coefficient}</span>
                             ) : null}
                           </div>
                         </div>
 
                         {/* Description (expandable) */}
                         {task.description && expandedDescs[task.id] && (
-                          <p className="text-[10px] text-gray-500 leading-relaxed bg-white/70 rounded px-1.5 py-1 -mt-1 border border-gray-200">
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed bg-white/70 dark:bg-[#1A2A4A]/80 rounded px-1.5 py-1 -mt-1 border border-gray-200 dark:border-[#1E293B]">
                             {task.description}
                           </p>
                         )}
@@ -763,7 +792,7 @@ export default function AssignmentsPage() {
                                     <button
                                       title={isLocked ? 'Kilidi kaldır' : 'Sabit ata (tekrar günlerinde otomatik gelir)'}
                                       onMouseDown={e => e.stopPropagation()}
-                                      onClick={() => toggleLock(u.id, task.id)}
+                                      onClick={e => { e.stopPropagation(); toggleLock(u.id, task.id); }}
                                       className="ml-0.5 text-[11px] hover:scale-110 transition-transform leading-none"
                                     >
                                       {isLocked ? '🔒' : '🔓'}
@@ -771,7 +800,7 @@ export default function AssignmentsPage() {
                                   )}
                                   <button
                                     onMouseDown={e => e.stopPropagation()}
-                                    onClick={() => removeFromTask(u.id, task.id)}
+                                    onClick={e => { e.stopPropagation(); removeFromTask(u.id, task.id); }}
                                     className="text-gray-300 hover:text-red-500 transition-colors leading-none ml-0.5"
                                   >
                                     ×
@@ -785,7 +814,7 @@ export default function AssignmentsPage() {
                         {/* Assign all — only for general / special */}
                         {(cat === 'general' || cat === 'special') && (
                           <button
-                            onClick={() => assignAll(task.id)}
+                            onClick={e => { e.stopPropagation(); assignAll(task.id); }}
                             className="text-[10px] text-gray-400 hover:text-indigo-600 text-left transition-colors mt-auto"
                           >
                             + Herkesi ata

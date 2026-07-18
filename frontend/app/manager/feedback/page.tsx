@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { Feedback, FeedbackCategory, FeedbackResponse } from '@/types';
@@ -144,11 +144,11 @@ function RespondModal({ feedback, onClose, onDone }: RespondModalProps) {
 function FeedbackCard({ fb, onRespond }: { fb: Feedback; onRespond: () => void }) {
   const cat = CATEGORIES.find(c => c.value === fb.category);
   return (
-    <div className={`bg-white rounded-xl border shadow-sm p-5 ${
-      fb.response === 'positive' ? 'border-emerald-200' : fb.response === 'negative' ? 'border-red-200' : 'border-gray-100'
+    <div className={`bg-white dark:bg-[#111E38] rounded-xl border shadow-sm p-5 ${
+      fb.response === 'positive' ? 'border-emerald-200 dark:border-emerald-800' : fb.response === 'negative' ? 'border-red-200 dark:border-red-900' : 'border-gray-100 dark:border-[#1E293B]'
     }`}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
             {cat?.emoji} {fb.category_display}
@@ -191,7 +191,12 @@ function FeedbackCard({ fb, onRespond }: { fb: Feedback; onRespond: () => void }
           <span className="ml-1 text-xs text-amber-600 font-semibold">{fb.customer_rating}/5</span>
         </div>
       )}
-      <p className="text-sm text-gray-700 leading-relaxed mb-3">{fb.content}</p>
+      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed mb-3">{fb.content}</p>
+      {fb.photo_url && (
+        <div className="mb-3">
+          <img src={fb.photo_url} alt="Geri bildirim fotoğrafı" className="rounded-lg max-h-48 object-cover border border-gray-100 dark:border-[#1E293B]" />
+        </div>
+      )}
 
       {/* Response note */}
       {fb.response && fb.response_note && (
@@ -227,7 +232,7 @@ function StarRow({ avg, count }: { avg: number | null; count: number }) {
           </svg>
         ))}
       </div>
-      <span className="text-2xl font-extrabold text-gray-800">
+      <span className="text-2xl font-extrabold text-gray-800 dark:text-white">
         {avg !== null ? avg.toFixed(1) : '—'}
       </span>
       <span className="text-sm text-gray-400">{count > 0 ? `${count} değerlendirme` : 'Henüz yok'}</span>
@@ -237,13 +242,13 @@ function StarRow({ avg, count }: { avg: number | null; count: number }) {
 
 function PeriodTabs({ active, onChange }: { active: Period; onChange: (p: Period) => void }) {
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+    <div className="flex gap-1 bg-gray-100 dark:bg-[#162543] rounded-xl p-1 w-fit">
       {PERIODS.map(p => (
         <button
           key={p.key}
           onClick={() => onChange(p.key)}
           className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-            active === p.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            active === p.key ? 'bg-white dark:bg-indigo-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-white'
           }`}
         >
           {p.label}
@@ -260,7 +265,7 @@ function PersonnelStatCards({ data }: { data: FeedbackPeriodStats['personnel'] }
   const pendRate = total > 0 ? Math.round((pending  / total) * 100) : 0;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="bg-white rounded-2xl border border-emerald-100 p-4 flex items-center gap-3 shadow-sm">
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl border border-emerald-100 dark:border-emerald-900 p-4 flex items-center gap-3 shadow-sm">
         <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
           <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
             <path d="M7.493 18.75c-.425 0-.82-.236-.975-.632A7.48 7.48 0 016 15.375c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23h-.777zM2.331 10.977a11.969 11.969 0 00-.831 4.398 12 12 0 00.52 3.507c.26.85 1.084 1.368 1.973 1.368H4.9c.445 0 .72-.498.523-.898a8.963 8.963 0 01-.924-3.977c0-1.708.476-3.305 1.302-4.666.245-.403-.028-.959-.5-.959H4.25c-.832 0-1.612.453-1.918 1.227z"/>
@@ -272,7 +277,7 @@ function PersonnelStatCards({ data }: { data: FeedbackPeriodStats['personnel'] }
           <div className="w-full bg-emerald-100 rounded-full h-1 mt-1.5"><div className="bg-emerald-500 h-1 rounded-full transition-all" style={{ width: `${posRate}%` }} /></div>
         </div>
       </div>
-      <div className="bg-white rounded-2xl border border-red-100 p-4 flex items-center gap-3 shadow-sm">
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl border border-red-100 dark:border-red-900 p-4 flex items-center gap-3 shadow-sm">
         <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
           <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
             <path d="M15.73 5.25h1.035A7.465 7.465 0 0118 9.375a7.465 7.465 0 01-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 01-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 00-.322 1.672V21a.75.75 0 01-.75.75 2.25 2.25 0 01-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 011.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 011.423.23l3.114 1.04a4.5 4.5 0 001.423.23zM21.669 13.773c.536-1.362.831-2.845.831-4.398 0-1.22-.182-2.398-.52-3.507-.26-.85-1.084-1.368-1.973-1.368H19.1c-.445 0-.72.498-.523.898.591 1.2.924 2.55.924 3.977a8.959 8.959 0 01-1.302 4.666c-.245.403.028.959.5.959h1.053c.832 0 1.612-.453 1.918-1.227z"/>
@@ -284,7 +289,7 @@ function PersonnelStatCards({ data }: { data: FeedbackPeriodStats['personnel'] }
           <div className="w-full bg-red-100 rounded-full h-1 mt-1.5"><div className="bg-red-500 h-1 rounded-full transition-all" style={{ width: `${negRate}%` }} /></div>
         </div>
       </div>
-      <div className="bg-white rounded-2xl border border-amber-100 p-4 flex items-center gap-3 shadow-sm">
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl border border-amber-100 dark:border-amber-900 p-4 flex items-center gap-3 shadow-sm">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
           <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -309,6 +314,7 @@ export default function FeedbackPage() {
   const [respondTarget, setRespondTarget] = useState<Feedback | null>(null);
   const [customerPeriod, setCustomerPeriod] = useState<Period>('today');
   const [personnelPeriod, setPersonnelPeriod] = useState<Period>('today');
+  const [listPeriod, setListPeriod] = useState<Period>('overall');
 
   useEffect(() => {
     svc.getFeedbackStats().then(setStats).catch(() => {});
@@ -334,17 +340,42 @@ export default function FeedbackPage() {
 
   const customerData = stats?.[customerPeriod]?.customer ?? null;
   const personnelData = stats?.[personnelPeriod]?.personnel ?? null;
-  const totalListCount = feedbacks.length;
+
+  // Frontend date filter for list section
+  function getListStart(period: Period): Date | null {
+    if (period === 'overall') return null;
+    const now = new Date();
+    if (period === 'today') {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return d;
+    }
+    if (period === 'week') {
+      const day = now.getDay();
+      const daysFromMonday = day === 0 ? 6 : day - 1;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMonday);
+      return monday;
+    }
+    if (period === 'month') {
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return null;
+  }
+
+  const listStart = getListStart(listPeriod);
+  const displayedFeedbacks = listStart
+    ? feedbacks.filter(fb => new Date(fb.created_at) >= listStart)
+    : feedbacks;
+  const totalListCount = displayedFeedbacks.length;
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] px-4 py-8 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-[#0A1128] px-4 py-8 max-w-4xl mx-auto">
       {/* Page header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Geri Bildirimler</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Geri Bildirimler</h1>
       </div>
 
       {/* ── Müşteri Değerlendirmeleri ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl border border-gray-100 dark:border-[#1E293B] shadow-sm p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Müşteri Değerlendirmeleri</h2>
@@ -362,7 +393,7 @@ export default function FeedbackPage() {
       </div>
 
       {/* ── Personel Feedback Yönetimi ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl border border-gray-100 dark:border-[#1E293B] shadow-sm p-6 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Personel Feedback Yönetimi</h2>
@@ -380,9 +411,12 @@ export default function FeedbackPage() {
       </div>
 
       {/* ── Feedback listesi ── */}
-      <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Tüm Geri Bildirimler</h3>
-        <span className="text-xs text-gray-400">({totalListCount})</span>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tüm Geri Bildirimler</h3>
+          <span className="text-xs text-gray-400">({totalListCount})</span>
+        </div>
+        <PeriodTabs active={listPeriod} onChange={setListPeriod} />
       </div>
 
       {/* Category filter */}
@@ -392,7 +426,7 @@ export default function FeedbackPage() {
             key={c.value}
             onClick={() => setCategoryFilter(c.value)}
             className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all ${
-              categoryFilter === c.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+              categoryFilter === c.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-[#111E38] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#1E293B] hover:border-indigo-300'
             }`}
           >
             {c.emoji} {c.label}
@@ -407,7 +441,7 @@ export default function FeedbackPage() {
             key={r.value}
             onClick={() => setResponseFilter(r.value)}
             className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all ${
-              responseFilter === r.value ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+              responseFilter === r.value ? 'bg-gray-800 text-white border-gray-800' : 'bg-white dark:bg-[#111E38] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#1E293B] hover:border-gray-400'
             }`}
           >
             {r.label}
@@ -426,7 +460,7 @@ export default function FeedbackPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {feedbacks.map(fb => (
+          {displayedFeedbacks.map(fb => (
             <FeedbackCard key={fb.id} fb={fb} onRespond={() => setRespondTarget(fb)} />
           ))}
         </div>

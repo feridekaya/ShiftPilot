@@ -3,7 +3,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import User
+from .models import User, EmailVerificationToken, PasswordResetToken
 from .permissions import IsManager, IsManagerOrSupervisor
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -12,6 +12,7 @@ from .serializers import (
     UserCreateSerializer,
     UserUpdateSerializer,
 )
+from .email_utils import send_verification_email, send_password_reset_email
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -23,10 +24,100 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
     def perform_create(self, serializer):
-        if not self.request.user or not self.request.user.is_authenticated:
-            serializer.save(role='employee')
+        is_public = not self.request.user or not self.request.user.is_authenticated
+        if is_public:
+            # Public registration: require email verification
+            user = serializer.save(role='manager', is_active=False)
+            token_obj = EmailVerificationToken.objects.create(user=user)
+            try:
+                send_verification_email(user, token_obj.token)
+            except Exception:
+                pass
         else:
             serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        is_public = not request.user or not request.user.is_authenticated
+        if is_public:
+            return Response(
+                {'detail': 'Hesabınız oluşturuldu. Lütfen e-posta adresinizi doğrulayın.'},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class VerifyEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token_str = request.data.get('token')
+        if not token_str:
+            return Response({'detail': 'Token gerekli.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            token_obj = EmailVerificationToken.objects.select_related('user').get(token=token_str)
+        except (EmailVerificationToken.DoesNotExist, ValueError):
+            return Response({'detail': 'Geçersiz veya süresi dolmuş bağlantı.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not token_obj.is_valid():
+            token_obj.delete()
+            return Response({'detail': 'Doğrulama bağlantısının süresi dolmuş.'}, status=status.HTTP_400_BAD_REQUEST)
+        user = token_obj.user
+        user.is_active = True
+        user.save()
+        token_obj.delete()
+        return Response({'detail': 'E-posta adresiniz doğrulandı. Giriş yapabilirsiniz.'})
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        try:
+            user = User.objects.get(email=email, is_active=True)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'Bu e-posta adresiyle kayıtlı aktif bir hesap bulunamadı.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        PasswordResetToken.objects.filter(user=user, used=False).delete()
+        token_obj = PasswordResetToken.objects.create(user=user)
+        try:
+            send_password_reset_email(user, token_obj.token)
+        except Exception:
+            token_obj.delete()
+            return Response(
+                {'detail': 'E-posta gönderilemedi. Lütfen daha sonra tekrar deneyin.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response({'detail': 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.'})
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token_str = request.data.get('token')
+        new_password = request.data.get('password', '')
+        if not token_str or not new_password:
+            return Response({'detail': 'Token ve yeni şifre gerekli.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 6:
+            return Response({'detail': 'Şifre en az 6 karakter olmalıdır.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            token_obj = PasswordResetToken.objects.select_related('user').get(token=token_str)
+        except (PasswordResetToken.DoesNotExist, ValueError):
+            return Response({'detail': 'Geçersiz veya süresi dolmuş bağlantı.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not token_obj.is_valid():
+            token_obj.delete()
+            return Response({'detail': 'Sıfırlama bağlantısının süresi dolmuş. Yeniden talep edin.'}, status=status.HTTP_400_BAD_REQUEST)
+        user = token_obj.user
+        user.set_password(new_password)
+        user.save()
+        token_obj.used = True
+        token_obj.save()
+        return Response({'detail': 'Şifreniz başarıyla güncellendi. Giriş yapabilirsiniz.'})
 
 
 class MeView(generics.RetrieveUpdateAPIView):

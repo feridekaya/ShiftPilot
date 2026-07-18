@@ -18,11 +18,19 @@ export async function getFeedbacks(params?: { category?: string; response?: stri
   return data;
 }
 
+export async function uploadFeedbackPhoto(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('photo', file);
+  const { data } = await api.post<{ url: string }>('/api/assignments/upload-photo/', form);
+  return data.url;
+}
+
 export async function createFeedback(data: {
   category: FeedbackCategory;
   content: string;
   is_anonymous?: boolean;
   customer_rating?: number | null;
+  photo_url?: string;
 }): Promise<Feedback> {
   const res = await api.post<Feedback>('/api/feedback/', data);
   return res.data;

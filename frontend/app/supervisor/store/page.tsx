@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { Assignment, Zone } from '@/types';
@@ -61,28 +61,28 @@ export default function SupervisorStorePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-slate-950 -m-6">
+      <div className="flex items-center justify-center min-h-[60vh] bg-white dark:bg-[#0A1128] -m-6">
         <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 -m-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="min-h-screen bg-white dark:bg-[#0A1128] -m-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
         <div>
-          <p className="text-slate-600 text-xs uppercase tracking-widest mb-1">Yerleşim Planı</p>
-          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Dükkan</h1>
+          <p className="text-gray-500 dark:text-slate-600 text-xs uppercase tracking-widest mb-1">Yerleşim Planı</p>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Dükkan</h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <p className="text-slate-500 text-xs">İş günü</p>
-            <p className="text-white font-mono font-bold text-sm">{businessDate}</p>
+            <p className="text-gray-500 dark:text-slate-500 text-xs">İş günü</p>
+            <p className="text-gray-900 dark:text-white font-mono font-bold text-sm">{businessDate}</p>
           </div>
-          <div className="w-px h-8 bg-slate-800" />
+          <div className="w-px h-8 bg-gray-200 dark:bg-[#111E38]" />
           <div className="flex flex-col items-end">
-            <p className="text-slate-500 text-xs">Toplam personel</p>
-            <p className="text-white font-bold text-sm">{totalStaff} kişi</p>
+            <p className="text-gray-500 dark:text-slate-500 text-xs">Toplam personel</p>
+            <p className="text-gray-900 dark:text-white font-bold text-sm">{totalStaff} kişi</p>
           </div>
         </div>
       </div>
@@ -94,8 +94,8 @@ export default function SupervisorStorePage() {
             onClick={() => setActiveSection(activeSection === s.key ? null : s.key)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all duration-150
               ${activeSection === s.key || activeSection === null
-                ? 'bg-slate-800 border-slate-700 text-white'
-                : 'bg-transparent border-slate-800 text-slate-600'}`}
+                ? 'bg-gray-800 dark:bg-[#111E38] border-gray-700 dark:border-[#1E293B] text-white'
+                : 'bg-transparent border-gray-300 dark:border-[#1E293B] text-gray-600 dark:text-slate-600'}`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
             {s.label}
@@ -121,22 +121,22 @@ export default function SupervisorStorePage() {
               style={{ animation: 'sectionFadeIn 0.35s ease forwards', animationDelay: `${idx * 80}ms` }}
             >
               <div className="flex items-center gap-3 mb-5">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 ring-2 ${section.ring}`}>
+                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-[#111E38] ring-2 ${section.ring}`}>
                   <div className={`w-2 h-2 rounded-full ${section.dot}`} />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2">
-                    <h2 className="text-white font-bold text-lg leading-none">{section.label}</h2>
-                    <span className="text-slate-600 text-xs">{section.sublabel}</span>
+                    <h2 className="text-gray-900 dark:text-white font-bold text-lg leading-none">{section.label}</h2>
+                    <span className="text-gray-500 dark:text-slate-600 text-xs">{section.sublabel}</span>
                   </div>
                   <p className={`text-xs mt-0.5 ${section.countColor}`}>
                     {staffCount > 0 ? `${staffCount} personel aktif` : 'Personel atanmadı'}
                   </p>
                 </div>
-                <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent hidden md:block" />
+                <div className="flex-1 h-px bg-gradient-to-r from-gray-200 dark:from-slate-800 to-transparent hidden md:block" />
               </div>
 
-              <div className="rounded-2xl p-3 md:p-5 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/60">
+              <div className="rounded-2xl p-3 md:p-5 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-slate-900 dark:to-slate-950 border border-gray-200 dark:border-[#1E293B]/60">
                 <FloorLayout zones={zones} data={zoneData} />
               </div>
             </div>

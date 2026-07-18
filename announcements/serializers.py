@@ -22,7 +22,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Announcement
         fields = [
-            'id', 'title', 'content', 'priority',
+            'id', 'title', 'content', 'priority', 'target_roles',
             'created_by', 'created_by_name', 'created_by_role',
             'created_at', 'updated_at', 'is_active',
             'read_count', 'total_users', 'is_read_by_me', 'readers',
@@ -37,7 +37,10 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         return obj.reads.count()
 
     def get_total_users(self, obj):
-        return User.objects.filter(is_active=True).exclude(role='manager').count()
+        roles = obj.target_roles or []
+        if not roles:
+            return User.objects.filter(is_active=True).exclude(role='manager').count()
+        return User.objects.filter(is_active=True, role__in=roles).count()
 
     def get_is_read_by_me(self, obj):
         request = self.context.get('request')

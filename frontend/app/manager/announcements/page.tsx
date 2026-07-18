@@ -5,9 +5,9 @@ import { Announcement, AnnouncementPriority } from '@/types';
 import * as svc from '@/services/announcementsService';
 
 const PRIORITY = {
-  normal:   { label: 'Normal',  border: 'border-l-gray-300',   badge: 'bg-gray-100 text-gray-600',   dot: 'bg-gray-400' },
-  medium:   { label: 'Orta',    border: 'border-l-amber-400',  badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400' },
-  critical: { label: 'Kritik',  border: 'border-l-red-500',    badge: 'bg-red-100 text-red-700',     dot: 'bg-red-500' },
+  normal:   { label: 'Normal',  border: 'border-l-gray-300',   badge: 'bg-gray-100 dark:bg-gray-700/40 text-gray-600 dark:text-gray-300',   dot: 'bg-gray-400' },
+  medium:   { label: 'Orta',    border: 'border-l-amber-400',  badge: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300', dot: 'bg-amber-400' },
+  critical: { label: 'Kritik',  border: 'border-l-red-500',    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',     dot: 'bg-red-500' },
 };
 
 function ClockIcon() {
@@ -64,21 +64,21 @@ function ReaderModal({ announcement, onClose }: ReaderModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-[#111E38] rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900">Görüntüleme Detayı</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h3 className="font-bold text-gray-900 dark:text-slate-100">Görüntüleme Detayı</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
         <div className="flex gap-3 mb-5">
-          <div className="flex-1 bg-emerald-50 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-emerald-600">{readers.length}</div>
-            <div className="text-xs text-gray-500 mt-0.5">Okudu</div>
+          <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl p-3 text-center">
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{readers.length}</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Okudu</div>
           </div>
-          <div className="flex-1 bg-red-50 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-red-500">{unread < 0 ? 0 : unread}</div>
-            <div className="text-xs text-gray-500 mt-0.5">Okumadı</div>
+          <div className="flex-1 bg-red-50 dark:bg-red-900/30 rounded-xl p-3 text-center">
+            <div className="text-2xl font-bold text-red-500 dark:text-red-400">{unread < 0 ? 0 : unread}</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Okumadı</div>
           </div>
         </div>
         {readers.length > 0 && (
@@ -110,7 +110,12 @@ export default function AnnouncementsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [readerAnn, setReaderAnn] = useState<Announcement | null>(null);
-  const [form, setForm] = useState({ title: '', content: '', priority: 'normal' as AnnouncementPriority });
+  const [form, setForm] = useState({
+    title: '',
+    content: '',
+    priority: 'normal' as AnnouncementPriority,
+    target_roles: [] as string[],
+  });
 
   useEffect(() => { load(); }, []);
 
@@ -121,14 +126,23 @@ export default function AnnouncementsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ title: '', content: '', priority: 'normal' });
+    setForm({ title: '', content: '', priority: 'normal', target_roles: [] });
     setShowForm(true);
   }
 
   function openEdit(a: Announcement) {
     setEditing(a);
-    setForm({ title: a.title, content: a.content, priority: a.priority });
+    setForm({ title: a.title, content: a.content, priority: a.priority, target_roles: a.target_roles ?? [] });
     setShowForm(true);
+  }
+
+  function toggleTargetRole(role: string) {
+    setForm(f => ({
+      ...f,
+      target_roles: f.target_roles.includes(role)
+        ? f.target_roles.filter(r => r !== role)
+        : [...f.target_roles, role],
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -136,10 +150,20 @@ export default function AnnouncementsPage() {
     setSaving(true);
     try {
       if (editing) {
-        const updated = await svc.updateAnnouncement(editing.id, form);
+        const updated = await svc.updateAnnouncement(editing.id, {
+          title: form.title,
+          content: form.content,
+          priority: form.priority,
+          target_roles: form.target_roles,
+        });
         setAnnouncements(prev => prev.map(a => a.id === updated.id ? updated : a));
       } else {
-        const created = await svc.createAnnouncement(form);
+        const created = await svc.createAnnouncement({
+          title: form.title,
+          content: form.content,
+          priority: form.priority,
+          target_roles: form.target_roles,
+        });
         setAnnouncements(prev => [created, ...prev]);
       }
       setShowForm(false);
@@ -161,12 +185,12 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] px-4 py-8 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-[#0A1128] px-4 py-8 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Duyurular</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{announcements.length} yayında duyuru</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Duyurular</h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">{announcements.length} yayında duyuru</p>
         </div>
         <button
           onClick={openCreate}
@@ -186,7 +210,7 @@ export default function AnnouncementsPage() {
           const p = PRIORITY[a.priority] ?? PRIORITY.normal;
           const isCritical = a.priority === 'critical';
           return (
-            <div key={a.id} className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${p.border} overflow-hidden`}>
+            <div key={a.id} className={`bg-white dark:bg-[#111E38] rounded-xl shadow-sm border border-gray-100 dark:border-[#1E293B] border-l-4 ${p.border} overflow-hidden`}>
               <div className="p-6">
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-4 mb-3">
@@ -196,18 +220,18 @@ export default function AnnouncementsPage() {
                         <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${p.dot}`} />
                         {p.label}
                       </span>
-                      <h2 className="text-[17px] font-semibold text-[#111827] leading-snug">
+                      <h2 className="text-[17px] font-semibold text-[#111827] dark:text-slate-100 leading-snug">
                         {a.title}
                         {isCritical && <AlertIcon />}
                       </h2>
                     </div>
-                    <p className="text-xs text-[#6B7280] mt-1.5">
+                    <p className="text-xs text-[#6B7280] dark:text-slate-400 mt-1.5">
                       <ClockIcon />
                       {new Date(a.created_at).toLocaleDateString('tr-TR', {
                         year: 'numeric', month: 'long', day: 'numeric',
                         hour: '2-digit', minute: '2-digit',
                       })}
-                      {a.created_by_name && <span className="ml-2 font-medium text-gray-500">· {a.created_by_name}</span>}
+                      {a.created_by_name && <span className="ml-2 font-medium text-gray-500 dark:text-slate-400">· {a.created_by_name}</span>}
                     </p>
                   </div>
 
@@ -215,27 +239,40 @@ export default function AnnouncementsPage() {
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => openEdit(a)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium transition-colors"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#162543] text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-[#192d4a] font-medium transition-colors"
                     >
                       Düzenle
                     </button>
                     <button
                       onClick={() => handleDelete(a)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium transition-colors"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 font-medium transition-colors"
                     >
                       Sil
                     </button>
                   </div>
                 </div>
 
+                {/* Target roles */}
+                {a.target_roles && a.target_roles.length > 0 && (
+                  <div className="flex gap-1.5 mb-2 flex-wrap">
+                    {a.target_roles.map(r => (
+                      <span key={r} className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                        r === 'supervisor' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      }`}>
+                        {r === 'supervisor' ? 'Şefler' : 'Personeller'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Content */}
-                <p className="text-[#374151] text-sm leading-relaxed whitespace-pre-wrap">{a.content}</p>
+                <p className="text-[#374151] dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{a.content}</p>
 
                 {/* Footer — read count */}
-                <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-end">
+                <div className="mt-4 pt-4 border-t border-gray-50 dark:border-[#1E293B] flex items-center justify-end">
                   <button
                     onClick={() => setReaderAnn(a)}
-                    className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors font-medium"
+                    className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium"
                   >
                     <EyeIcon />
                     Görüldü: {a.read_count}/{a.total_users}
@@ -253,17 +290,17 @@ export default function AnnouncementsPage() {
       {/* Create / Edit modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-900">{editing ? 'Duyuruyu Düzenle' : 'Yeni Duyuru'}</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white dark:bg-[#111E38] rounded-2xl shadow-2xl w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-[#1E293B]">
+              <h2 className="font-bold text-gray-900 dark:text-slate-100">{editing ? 'Duyuruyu Düzenle' : 'Yeni Duyuru'}</h2>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Önem Derecesi</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Önem Derecesi</label>
                 <div className="flex gap-2">
                   {(['normal', 'medium', 'critical'] as AnnouncementPriority[]).map(pv => (
                     <button
@@ -272,10 +309,10 @@ export default function AnnouncementsPage() {
                       onClick={() => setForm({ ...form, priority: pv })}
                       className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
                         form.priority === pv
-                          ? pv === 'critical' ? 'border-red-500 bg-red-50 text-red-700'
-                            : pv === 'medium' ? 'border-amber-400 bg-amber-50 text-amber-700'
-                            : 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                          ? pv === 'critical' ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            : pv === 'medium' ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                            : 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                          : 'border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-500 dark:text-slate-400 hover:border-gray-300 dark:hover:border-slate-500'
                       }`}
                     >
                       {PRIORITY[pv].label}
@@ -284,33 +321,65 @@ export default function AnnouncementsPage() {
                 </div>
               </div>
 
+              {/* Target roles */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Kime Gönderilsin?</label>
+                <div className="flex gap-2">
+                  {(['employee', 'supervisor'] as const).map(role => {
+                    const labels = { employee: 'Personeller', supervisor: 'Şefler' };
+                    const active = form.target_roles.includes(role);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => toggleTargetRole(role)}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                          active
+                            ? role === 'supervisor'
+                              ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                              : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                            : 'border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-500 dark:text-slate-400 hover:border-gray-300 dark:hover:border-slate-500'
+                        }`}
+                      >
+                        {labels[role]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1.5">
+                  {form.target_roles.length === 0
+                    ? 'Seçilmezse herkese gönderilir.'
+                    : `Yalnızca seçili gruplara gönderilir.`}
+                </p>
+              </div>
+
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Başlık</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Başlık</label>
                 <input
                   value={form.title}
                   onChange={e => setForm({ ...form, title: e.target.value })}
                   required
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                   placeholder="Duyuru başlığı..."
                 />
               </div>
 
               {/* Content */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">İçerik</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">İçerik</label>
                 <textarea
                   value={form.content}
                   onChange={e => setForm({ ...form, content: e.target.value })}
                   required
                   rows={5}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
                   placeholder="Duyuru içeriği..."
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-[#162543] rounded-xl hover:bg-gray-200 dark:hover:bg-[#192d4a] transition-colors">
                   İptal
                 </button>
                 <button type="submit" disabled={saving} className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60">

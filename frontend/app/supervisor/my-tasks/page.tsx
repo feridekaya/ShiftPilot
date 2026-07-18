@@ -1,106 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Assignment, TaskCategory } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import * as assignmentService from '@/services/assignments';
 import * as submissionService from '@/services/submissions';
 import { CATEGORY_LABEL, CATEGORY_BORDER, CATEGORY_BADGE } from '@/lib/categoryStyles';
 import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
-
-// ── Photo Capture Modal ──────────────────────────────────────────────────────
-function PhotoModal({ assignment, onSubmit, onClose }: {
-  assignment: Assignment;
-  onSubmit: (id: number, photos: string[], note: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [note, setNote] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const cat = assignment.task.category as TaskCategory;
-
-  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    Array.from(e.target.files ?? []).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => setPhotos(p => [...p, reader.result as string]);
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
-  }
-
-  async function handleSubmit() {
-    if (assignment.task.requires_photo && photos.length === 0) {
-      setError('Bu görev için fotoğraf zorunludur.');
-      return;
-    }
-    setError(''); setSubmitting(true);
-    try { await onSubmit(assignment.id, photos, note); }
-    catch { setError('Gönderi başarısız. Tekrar deneyin.'); setSubmitting(false); }
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className={`rounded-lg border ${CATEGORY_BORDER[cat]} pl-4 pr-3 py-3 bg-gray-50 flex flex-col gap-1`}>
-        <div className="flex items-center gap-2">
-          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_BADGE[cat]}`}>{CATEGORY_LABEL[cat]}</span>
-          {assignment.zone && <span className="text-xs text-gray-500">{assignment.zone.name}</span>}
-        </div>
-        <p className="font-semibold text-sm text-gray-800 flex items-center gap-2 flex-wrap">
-          {assignment.task.title}
-          {assignment.times_per_day > 1 && (
-            <span className="text-[11px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-              {assignment.occurrence}/{assignment.times_per_day}. kontrol
-            </span>
-          )}
-        </p>
-        {assignment.task.description && <p className="text-xs text-gray-500">{assignment.task.description}</p>}
-      </div>
-
-      {photos.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          {photos.map((src, i) => (
-            <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
-              <img src={src} alt="" className="w-full h-full object-cover" />
-              <button onClick={() => setPhotos(p => p.filter((_, j) => j !== i))}
-                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100">×</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div>
-        <input ref={inputRef} type="file" accept="image/*" capture="environment" multiple onChange={handleFiles} className="hidden" />
-        <button onClick={() => inputRef.current?.click()}
-          className="w-full border-2 border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl py-4 text-sm text-gray-500 hover:text-indigo-600 transition-all flex flex-col items-center gap-1">
-          <span className="text-2xl">📷</span>
-          <span>{photos.length === 0
-            ? (assignment.task.requires_photo ? 'Fotoğraf Ekle (zorunlu)' : 'Fotoğraf Ekle (isteğe bağlı)')
-            : '+ Daha Fazla Fotoğraf'}</span>
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-gray-600">Not (isteğe bağlı)</label>
-        <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-      </div>
-
-      {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded">{error}</p>}
-
-      <div className="flex gap-2">
-        <Button variant="secondary" onClick={onClose} className="flex-1">İptal</Button>
-        <Button onClick={handleSubmit} isLoading={submitting} className="flex-1">
-          Gönder {photos.length > 0 && `(${photos.length} fotoğraf)`}
-        </Button>
-      </div>
-    </div>
-  );
-}
+import PhotoModal from '@/components/PhotoModal';
 
 // ── Task Card ────────────────────────────────────────────────────────────────
 function TaskCard({ assignment: a, onOpen, showDate }: {

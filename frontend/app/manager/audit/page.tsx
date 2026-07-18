@@ -11,19 +11,19 @@ import { downloadExcel } from '@/lib/excel';
 function toISO(d: Date) { return d.toLocaleDateString('en-CA'); }
 
 function StarDisplay({ rating }: { rating: number | null }) {
-  if (!rating) return <span className="text-gray-300 text-xs">—</span>;
+  if (!rating) return <span className="text-gray-300 dark:text-slate-600 text-xs">—</span>;
   return (
     <span className="text-amber-400 text-sm tracking-tighter">
       {'★'.repeat(rating)}{'☆'.repeat(5 - rating)}
-      <span className="text-xs text-gray-400 ml-1">{rating}/5</span>
+      <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">{rating}/5</span>
     </span>
   );
 }
 
 function StatusBadge({ status }: { status: 'approved' | 'rejected' }) {
   return status === 'approved'
-    ? <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Onaylandı</span>
-    : <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">✕ Reddedildi</span>;
+    ? <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">✓ Onaylandı</span>
+    : <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">✕ Reddedildi</span>;
 }
 
 export default function AuditPage() {
@@ -37,7 +37,6 @@ export default function AuditPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Filters
   const [supervisorId, setSupervisorId] = useState('');
   const [taskId, setTaskId] = useState('');
   const [status, setStatus] = useState('');
@@ -56,43 +55,31 @@ export default function AuditPage() {
     setLoading(false);
   }
 
-  // Initial load + static data
   useEffect(() => {
-    Promise.all([
-      taskService.getTasks(),
-      userService.getUsers(),
-    ]).then(([allTasks, allUsers]) => {
+    Promise.all([taskService.getTasks(), userService.getUsers()]).then(([allTasks, allUsers]) => {
       setTasks(allTasks);
       setSupervisors(allUsers.filter(u => u.role === 'supervisor' || u.role === 'manager'));
     });
     load();
   }, []);
 
-  // Auto-refresh every 10s
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (autoRefresh) {
-      pollRef.current = setInterval(load, 10_000);
-    }
+    if (autoRefresh) pollRef.current = setInterval(load, 10_000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [autoRefresh, supervisorId, taskId, status, dateFrom, dateTo]);
 
-  // Stats
   const approvedEntries = entries.filter(e => e.approval_status === 'approved');
   const rejectedEntries = entries.filter(e => e.approval_status === 'rejected');
-  const ratedEntries = approvedEntries.filter(e => e.rating);
+  const ratedEntries    = approvedEntries.filter(e => e.rating);
   const avgRating = ratedEntries.length
     ? (ratedEntries.reduce((s, e) => s + (e.rating ?? 0), 0) / ratedEntries.length).toFixed(1)
     : null;
 
-  // Most rejected tasks
   const taskRejections: Record<string, number> = {};
-  for (const e of rejectedEntries) {
-    taskRejections[e.task_title] = (taskRejections[e.task_title] ?? 0) + 1;
-  }
+  for (const e of rejectedEntries) taskRejections[e.task_title] = (taskRejections[e.task_title] ?? 0) + 1;
   const topRejected = Object.entries(taskRejections).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
-  // Supervisor stats
   const supStats: Record<string, { name: string; approved: number; rejected: number; totalRating: number; ratingCount: number }> = {};
   for (const e of entries) {
     if (!e.supervisor_name) continue;
@@ -126,21 +113,24 @@ export default function AuditPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Denetim Masası</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Tüm onay ve red işlemlerinin kaydı</p>
+          <h1 className="text-xl font-bold dark:text-white">Denetim Masası</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Tüm onay ve red işlemlerinin kaydı</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 cursor-pointer select-none">
             <div
               onClick={() => setAutoRefresh(r => !r)}
-              className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-green-500' : 'bg-gray-200'}`}
+              className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-green-500' : 'bg-gray-200 dark:bg-[#1E293B]'}`}
             >
               <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${autoRefresh ? 'left-4' : 'left-0.5'}`} />
             </div>
             Canlı
           </label>
-          <button onClick={handleExport} disabled={entries.length === 0}
-            className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 disabled:opacity-40">
+          <button
+            onClick={handleExport}
+            disabled={entries.length === 0}
+            className="text-xs px-3 py-1.5 border border-gray-300 dark:border-[#1E293B] rounded-lg hover:bg-gray-50 dark:hover:bg-[#162543] text-gray-600 dark:text-slate-300 disabled:opacity-40"
+          >
             ⬇ Excel
           </button>
         </div>
@@ -149,13 +139,13 @@ export default function AuditPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Toplam İşlem', value: entries.length, color: 'text-gray-800' },
-          { label: 'Onaylanan', value: approvedEntries.length, color: 'text-green-600' },
-          { label: 'Reddedilen', value: rejectedEntries.length, color: 'text-red-600' },
-          { label: 'Ort. Puan', value: avgRating ? `${avgRating} ★` : '—', color: 'text-amber-500' },
+          { label: 'Toplam İşlem', value: entries.length,          color: 'text-gray-800 dark:text-slate-100' },
+          { label: 'Onaylanan',    value: approvedEntries.length,  color: 'text-green-600' },
+          { label: 'Reddedilen',   value: rejectedEntries.length,  color: 'text-red-600' },
+          { label: 'Ort. Puan',    value: avgRating ? `${avgRating} ★` : '—', color: 'text-amber-500' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
-            <p className="text-xs text-gray-400">{s.label}</p>
+          <div key={s.label} className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow-sm px-4 py-3">
+            <p className="text-xs text-gray-400 dark:text-slate-500">{s.label}</p>
             <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -164,16 +154,15 @@ export default function AuditPage() {
       {/* Supervisor + top rejected side cards */}
       {(Object.keys(supStats).length > 0 || topRejected.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Supervisor stats */}
           {Object.keys(supStats).length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Şef İstatistikleri</p>
+            <div className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow-sm overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#1E293B] bg-gray-50 dark:bg-[#162543]">
+                <p className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Şef İstatistikleri</p>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 dark:divide-[#1E293B]">
                 {Object.values(supStats).sort((a, b) => (b.approved + b.rejected) - (a.approved + a.rejected)).map(s => (
                   <div key={s.name} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-gray-800">{s.name}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{s.name}</span>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-green-600 font-semibold">{s.approved} ✓</span>
                       <span className="text-red-500 font-semibold">{s.rejected} ✕</span>
@@ -189,20 +178,19 @@ export default function AuditPage() {
             </div>
           )}
 
-          {/* Most rejected tasks */}
           {topRejected.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">En Çok Reddedilen Görevler</p>
+            <div className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow-sm overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#1E293B] bg-gray-50 dark:bg-[#162543]">
+                <p className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">En Çok Reddedilen Görevler</p>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 dark:divide-[#1E293B]">
                 {topRejected.map(([title, count], i) => (
                   <div key={title} className="px-4 py-2.5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-black w-5 ${i === 0 ? 'text-red-500' : 'text-gray-300'}`}>#{i + 1}</span>
-                      <span className="text-sm text-gray-800">{title}</span>
+                      <span className={`text-xs font-black w-5 ${i === 0 ? 'text-red-500' : 'text-gray-300 dark:text-slate-600'}`}>#{i + 1}</span>
+                      <span className="text-sm text-gray-800 dark:text-slate-200">{title}</span>
                     </div>
-                    <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{count} red</span>
+                    <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded-full">{count} red</span>
                   </div>
                 ))}
               </div>
@@ -212,28 +200,28 @@ export default function AuditPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+      <div className="flex flex-wrap gap-2 bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow-sm p-3">
         <select value={supervisorId} onChange={e => setSupervisorId(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          className="border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Tüm şefler</option>
           {supervisors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={taskId} onChange={e => setTaskId(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-[200px]">
+          className="border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-[200px]">
           <option value="">Tüm görevler</option>
           {tasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
         </select>
         <select value={status} onChange={e => setStatus(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          className="border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Tüm durumlar</option>
           <option value="approved">Onaylanan</option>
           <option value="rejected">Reddedilen</option>
         </select>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-        <span className="self-center text-gray-400 text-sm">→</span>
+          className="border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <span className="self-center text-gray-400 dark:text-slate-500 text-sm">→</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          className="border border-gray-200 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
         <button onClick={load}
           className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors">
           Uygula
@@ -246,11 +234,11 @@ export default function AuditPage() {
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">Bu filtreye ait kayıt bulunamadı.</div>
+        <div className="text-center py-20 text-gray-400 dark:text-slate-500">Bu filtreye ait kayıt bulunamadı.</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-gray-800 text-white text-xs uppercase tracking-wider">
+            <thead className="bg-gray-800 dark:bg-[#162543] text-white dark:text-slate-200 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">Zaman</th>
                 <th className="px-4 py-3 text-left">Personel</th>
@@ -263,23 +251,23 @@ export default function AuditPage() {
             </thead>
             <tbody>
               {entries.map((e, i) => {
-                const rowBg = (['bg-white', 'bg-[#f8f9fa]', 'bg-[#f0f2f5]'] as const)[i % 3];
+                const rowBg = (['bg-white dark:bg-[#111E38]', 'bg-[#f8f9fa] dark:bg-[#0A1128]', 'bg-[#f0f2f5] dark:bg-[#111E38]'] as const)[i % 3];
                 return (
-                  <tr key={e.id} className={`${rowBg} transition-colors hover:bg-[#e9ecef]`}>
+                  <tr key={e.id} className={`${rowBg} transition-colors hover:bg-[#e9ecef] dark:hover:bg-[#192d4a]`}>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <p className="text-xs text-gray-500">{e.assignment_date}</p>
-                      <p className="text-[10px] text-gray-300">{new Date(e.submitted_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">{e.assignment_date}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500">{new Date(e.submitted_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p>
                     </td>
-                    <td className="px-4 py-2.5 font-medium text-gray-800">{e.employee_name}</td>
+                    <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-slate-200">{e.employee_name}</td>
                     <td className="px-4 py-2.5">
-                      <p className="text-gray-800">{e.task_title}</p>
-                      {e.zone_name && <p className="text-[10px] text-gray-400">📍 {e.zone_name}</p>}
+                      <p className="text-gray-800 dark:text-slate-200">{e.task_title}</p>
+                      {e.zone_name && <p className="text-[10px] text-gray-400 dark:text-slate-500">📍 {e.zone_name}</p>}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600">{e.supervisor_name ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-slate-400">{e.supervisor_name ?? '—'}</td>
                     <td className="px-4 py-2.5 text-center"><StatusBadge status={e.approval_status} /></td>
                     <td className="px-4 py-2.5 text-center"><StarDisplay rating={e.rating} /></td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[180px]">
-                      {e.note || <span className="text-gray-200">—</span>}
+                    <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400 max-w-[180px]">
+                      {e.note || <span className="text-gray-300 dark:text-slate-600">—</span>}
                     </td>
                   </tr>
                 );
@@ -289,7 +277,7 @@ export default function AuditPage() {
         </div>
       )}
 
-      {autoRefresh && <p className="text-[10px] text-gray-300 text-center">Her 10 saniyede güncellenir</p>}
+      {autoRefresh && <p className="text-[10px] text-gray-400 dark:text-slate-500 text-center">Her 10 saniyede güncellenir</p>}
     </div>
   );
 }

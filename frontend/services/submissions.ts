@@ -1,6 +1,17 @@
 import { TaskSubmission } from '@/types';
 import api from './api';
 
+export async function uploadPhoto(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('photo', file);
+  const { data } = await api.post<{ url: string }>(
+    '/api/assignments/upload-photo/',
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return data.url;
+}
+
 export async function createSubmission(
   assignmentId: number,
   photoUrls: string[],

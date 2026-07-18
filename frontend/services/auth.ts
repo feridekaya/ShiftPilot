@@ -4,7 +4,7 @@ import api from './api';
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await axios.post<AuthResponse>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/login`,
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/login/`,
     { email, password }
   );
   localStorage.setItem('access_token', data.access);
@@ -18,18 +18,18 @@ export async function register(payload: {
   password: string;
   gender?: string;
 }): Promise<void> {
-  await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/register`, payload);
+  await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/register/`, payload);
 }
 
 export async function getMe(): Promise<AuthUser> {
-  const { data } = await api.get<AuthUser>('/api/auth/me');
+  const { data } = await api.get<AuthUser>('/api/auth/me/');
   return data;
 }
 
 export async function logout(): Promise<void> {
   try {
     // Tell the backend to close any active break before the token is gone
-    await api.post('/api/auth/logout');
+    await api.post('/api/auth/logout/');
   } catch {
     // Ignore errors — token may already be invalid; proceed with local cleanup
   } finally {

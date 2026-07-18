@@ -5,9 +5,9 @@ import { Announcement } from '@/types';
 import * as svc from '@/services/announcementsService';
 
 const PRIORITY = {
-  normal:   { label: 'Normal',  border: 'border-l-gray-300',  badge: 'bg-gray-100 text-gray-600',   dot: 'bg-gray-400' },
-  medium:   { label: 'Orta',    border: 'border-l-amber-400', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400' },
-  critical: { label: 'Kritik',  border: 'border-l-red-500',   badge: 'bg-red-100 text-red-700',     dot: 'bg-red-500' },
+  normal:   { label: 'Normal',  border: 'border-l-gray-300',  badge: 'bg-gray-100 dark:bg-gray-700/40 text-gray-600 dark:text-gray-300',   dot: 'bg-gray-400' },
+  medium:   { label: 'Orta',    border: 'border-l-amber-400', badge: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300', dot: 'bg-amber-400' },
+  critical: { label: 'Kritik',  border: 'border-l-red-500',   badge: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',     dot: 'bg-red-500' },
 };
 
 export default function AnnouncementsPage() {
@@ -33,19 +33,19 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] px-4 py-8 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-[#0A1128] px-4 py-8 max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Duyurular</h1>
-        <p className="text-sm text-gray-400 mt-0.5">{announcements.length} yayında duyuru</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Duyurular</h1>
+        <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">{announcements.length} yayında duyuru</p>
       </div>
 
       {announcements.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <svg className="w-24 h-24 text-gray-200 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+          <svg className="w-24 h-24 text-gray-200 dark:text-slate-700 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
           </svg>
-          <p className="text-lg font-semibold text-gray-400 mb-1">Henüz bir duyuru yayınlanmadı.</p>
-          <p className="text-sm text-gray-400">Yöneticiniz duyuru yayınladığında burada görünecek.</p>
+          <p className="text-lg font-semibold text-gray-400 dark:text-slate-500 mb-1">Henüz bir duyuru yayınlanmadı.</p>
+          <p className="text-sm text-gray-400 dark:text-slate-500">Yöneticiniz duyuru yayınladığında burada görünecek.</p>
         </div>
       )}
 
@@ -54,7 +54,7 @@ export default function AnnouncementsPage() {
           const p = PRIORITY[a.priority] ?? PRIORITY.normal;
           const isCritical = a.priority === 'critical';
           return (
-            <div key={a.id} className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${p.border} ${!a.is_read_by_me ? 'ring-2 ring-indigo-100' : ''}`}>
+            <div key={a.id} className={`bg-white dark:bg-[#111E38] rounded-xl shadow-sm border border-gray-100 dark:border-[#1E293B] border-l-4 ${p.border} ${!a.is_read_by_me ? 'ring-2 ring-indigo-100 dark:ring-indigo-900/50' : ''}`}>
               <div className="p-6">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full ${p.badge}`}>
@@ -62,10 +62,10 @@ export default function AnnouncementsPage() {
                     {p.label}
                   </span>
                   {!a.is_read_by_me && (
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600">Yeni</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300">Yeni</span>
                   )}
                 </div>
-                <h2 className="text-[17px] font-semibold text-[#111827] leading-snug mt-1">
+                <h2 className="text-[17px] font-semibold text-[#111827] dark:text-slate-100 leading-snug mt-1">
                   {a.title}
                   {isCritical && (
                     <svg className="w-4 h-4 inline ml-1 -mt-0.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -73,7 +73,7 @@ export default function AnnouncementsPage() {
                     </svg>
                   )}
                 </h2>
-                <p className="text-xs text-[#6B7280] mt-1.5 mb-4">
+                <p className="text-xs text-[#6B7280] dark:text-slate-400 mt-1.5 mb-4">
                   <svg className="w-3.5 h-3.5 inline mr-1 -mt-0.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2"/>
                   </svg>
@@ -81,9 +81,9 @@ export default function AnnouncementsPage() {
                     year: 'numeric', month: 'long', day: 'numeric',
                     hour: '2-digit', minute: '2-digit',
                   })}
-                  {a.created_by_name && <span className="ml-2 font-medium text-gray-500">· {a.created_by_name}</span>}
+                  {a.created_by_name && <span className="ml-2 font-medium text-gray-500 dark:text-slate-400">· {a.created_by_name}</span>}
                 </p>
-                <p className="text-[#374151] text-sm leading-relaxed whitespace-pre-wrap">{a.content}</p>
+                <p className="text-[#374151] dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{a.content}</p>
               </div>
             </div>
           );

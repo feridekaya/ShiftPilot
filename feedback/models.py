@@ -29,6 +29,8 @@ class Feedback(models.Model):
     is_anonymous = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    customer_rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5 yıldız
+
     response = models.CharField(max_length=10, choices=RESPONSE_CHOICES, null=True, blank=True)
     response_note = models.TextField(blank=True, default='')
     responded_by = models.ForeignKey(
@@ -38,6 +40,8 @@ class Feedback(models.Model):
         related_name='feedback_responses'
     )
     responded_at = models.DateTimeField(null=True, blank=True)
+
+    photo_url = models.URLField(blank=True, default='')
 
     class Meta:
         ordering = ['-created_at']

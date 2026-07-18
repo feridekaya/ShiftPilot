@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +10,22 @@ from users.permissions import IsManager, IsManagerOrSupervisor
 from .models import Break
 from .serializers import BreakSerializer
 from assignments.utils import get_business_date
+
+BREAK_LIMITS = {'lunch': 20 * 60, 'short': 10 * 60}  # seconds
+
+
+def auto_end_overtime(queryset=None):
+    """End any active breaks that have exceeded their time limit."""
+    now = timezone.now()
+    qs = queryset if queryset is not None else Break.objects.filter(ended_at__isnull=True)
+    to_end = []
+    for b in qs.select_related('user'):
+        limit = BREAK_LIMITS.get(b.break_type, 600)
+        if (now - b.started_at).total_seconds() >= limit:
+            b.ended_at = b.started_at + timedelta(seconds=limit)
+            to_end.append(b)
+    if to_end:
+        Break.objects.bulk_update(to_end, ['ended_at'])
 
 
 class StartBreakView(GenericAPIView):
@@ -67,6 +85,7 @@ class ActiveBreaksView(GenericAPIView):
     serializer_class = BreakSerializer
 
     def get(self, request):
+        auto_end_overtime()
         qs = Break.objects.filter(ended_at__isnull=True).select_related('user').order_by('started_at')
         return Response(BreakSerializer(qs, many=True).data)
 
@@ -77,6 +96,7 @@ class MyActiveBreakView(GenericAPIView):
     serializer_class = BreakSerializer
 
     def get(self, request):
+        auto_end_overtime(Break.objects.filter(user=request.user, ended_at__isnull=True))
         active = Break.objects.filter(user=request.user, ended_at__isnull=True).first()
         if not active:
             return Response(None)

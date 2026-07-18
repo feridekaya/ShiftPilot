@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { User, Role, Gender, Assignment, ApprovalStatus } from '@/types';
@@ -129,7 +129,7 @@ export default function UsersPage() {
           placeholder="İsim veya e-posta ara..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
         <button
           onClick={() => setHideInactive(h => !h)}
@@ -150,9 +150,9 @@ export default function UsersPage() {
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} kullanıcı</span>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+      <div className="bg-white dark:bg-[#111E38] rounded-lg shadow overflow-hidden overflow-x-auto">
         <table className="w-full text-sm min-w-[600px]">
-          <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+          <thead className="bg-gray-50 dark:bg-[#162543] text-gray-600 dark:text-slate-300 uppercase text-xs">
             <tr>
               <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-900" onClick={() => handleSort('name')}>
                 Ad <SortIcon field="name" />
@@ -170,9 +170,9 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {filtered.map((u, i) => (
-              <tr key={u.id} className={`transition-colors ${['bg-white', 'bg-[#f8f9fa]', 'bg-[#f0f2f5]'][i % 3]} hover:bg-[#e9ecef] ${!u.is_active ? 'opacity-50' : ''}`}>
+              <tr key={u.id} className={`transition-colors ${['bg-white dark:bg-[#111E38]', 'bg-[#f8f9fa] dark:bg-[#0A1128]', 'bg-[#f0f2f5] dark:bg-[#111E38]'][i % 3]} hover:bg-[#e9ecef] dark:hover:bg-[#192d4a] dark:text-slate-100 ${!u.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-3 font-medium">{u.name}</td>
-                <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{u.email}</td>
                 <td className="px-4 py-3"><Badge status={u.role} /></td>
                 <td className="px-4 py-3 text-gray-600">
                   {u.gender === 'male' ? 'Erkek' : u.gender === 'female' ? 'Kadın' : '-'}
