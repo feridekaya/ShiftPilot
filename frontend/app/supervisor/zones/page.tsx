@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { Zone } from '@/types';
@@ -58,12 +58,12 @@ export default function ZonesPage() {
         <Button onClick={openCreate}>+ Yeni Bölge</Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow divide-y">
+      <div className="bg-white dark:bg-[#111E38] rounded-lg shadow divide-y dark:divide-[#1E293B]">
         {zones.map(z => (
-          <div key={z.id} className="px-4 py-3 flex justify-between items-center">
+          <div key={z.id} className="px-4 py-3 flex justify-between items-center dark:text-slate-100">
             <div>
               <p className="font-medium">{z.name}</p>
-              {z.description && <p className="text-sm text-gray-500">{z.description}</p>}
+              {z.description && <p className="text-sm text-gray-500 dark:text-slate-400">{z.description}</p>}
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => openEdit(z)}>Düzenle</Button>
@@ -71,7 +71,7 @@ export default function ZonesPage() {
             </div>
           </div>
         ))}
-        {zones.length === 0 && <p className="px-4 py-6 text-sm text-gray-400 text-center">Henüz bölge yok.</p>}
+        {zones.length === 0 && <p className="px-4 py-6 text-sm text-gray-400 dark:text-slate-500 text-center">Henüz bölge yok.</p>}
       </div>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editing ? 'Bölgeyi Düzenle' : 'Yeni Bölge'}>

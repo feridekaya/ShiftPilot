@@ -5,7 +5,7 @@ from tasks.models import Task, Shift, Zone
 from tasks.serializers import TaskSerializer, ShiftSerializer, ZoneSerializer
 from users.models import User
 from users.serializers import UserSerializer
-from .models import Assignment, TaskSubmission, SubmissionPhoto, RejectionLog
+from .models import Assignment, TaskSubmission, SubmissionPhoto, RejectionLog, ActivityLog
 
 
 class SubmissionPhotoSerializer(serializers.ModelSerializer):
@@ -216,3 +216,15 @@ class SubmissionApprovalSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskSubmission
         fields = ['note', 'rating']
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'created_at', 'action', 'action_display',
+            'actor_name', 'target_user_name', 'task_title',
+            'business_date', 'note', 'assignment',
+        ]

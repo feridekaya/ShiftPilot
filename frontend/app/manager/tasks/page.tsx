@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Task, Zone, Role, TaskSchedule, Frequency, TaskCategory } from '@/types';
@@ -265,12 +265,12 @@ export default function TasksPage() {
           placeholder="Görev ara..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-52"
+          className="border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-52"
         />
         <select
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value as TaskCategory | '')}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          className="border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         >
           <option value="">Tüm kategoriler</option>
           {CATEGORIES.map(c => (
@@ -281,9 +281,9 @@ export default function TasksPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+      <div className="bg-white dark:bg-[#111E38] rounded-lg shadow overflow-hidden overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+          <thead className="bg-gray-50 dark:bg-[#162543] text-gray-600 dark:text-slate-300 uppercase text-xs">
             <tr>
               <th
                 className="px-4 py-3 text-left cursor-pointer select-none hover:text-indigo-600"
@@ -311,23 +311,23 @@ export default function TasksPage() {
           </thead>
           <tbody>
             {displayed.map((t, i) => (
-              <tr key={t.id} className={`transition-colors ${['bg-white', 'bg-[#f8f9fa]', 'bg-[#f0f2f5]'][i % 3]} hover:bg-[#e9ecef]`}>
-                <td className="px-4 py-3 font-medium">{t.title}</td>
+              <tr key={t.id} className={`transition-colors ${['bg-white dark:bg-[#111E38]', 'bg-[#f8f9fa] dark:bg-[#0A1128]', 'bg-[#f0f2f5] dark:bg-[#111E38]'][i % 3]} hover:bg-[#e9ecef] dark:hover:bg-[#192d4a] dark:text-slate-100`}>
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{t.title}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryColor[t.category]}`}>
                     {categoryLabel[t.category]}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{t.zone?.name ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px]">
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{t.zone?.name ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs max-w-[200px]">
                   {t.description
                     ? <span title={t.description}>{t.description.length > 80 ? t.description.slice(0, 80) + '…' : t.description}</span>
                     : <span className="text-gray-300 italic">—</span>}
                 </td>
-                <td className="px-4 py-3">{t.coefficient}</td>
-                <td className="px-4 py-3">{t.requires_photo ? 'Evet' : 'Hayır'}</td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{scheduleToLabel(t.schedule)}</td>
-                <td className="px-4 py-3 text-gray-600">{t.allowed_roles.map(r => roleLabel[r]).join(', ')}</td>
+                <td className="px-4 py-3 dark:text-slate-100">{t.coefficient}</td>
+                <td className="px-4 py-3 dark:text-slate-100">{t.requires_photo ? 'Evet' : 'Hayır'}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400 text-xs">{scheduleToLabel(t.schedule)}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{t.allowed_roles.map(r => roleLabel[r]).join(', ')}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>Düzenle</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDelete(t)}>Sil</Button>
@@ -353,9 +353,9 @@ export default function TasksPage() {
 
           {/* Category */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Kategori</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">Kategori</label>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.category}
               onChange={e => setForm({ ...form, category: e.target.value as TaskCategory })}
             >
@@ -365,9 +365,9 @@ export default function TasksPage() {
 
           {/* Zone */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Bölge</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">Bölge</label>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.zone_id}
               onChange={e => setForm({ ...form, zone_id: Number(e.target.value) })}
               required
@@ -388,9 +388,9 @@ export default function TasksPage() {
 
           {/* Roles */}
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">İzin Verilen Roller</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">İzin Verilen Roller</label>
             {ALL_ROLES.map(r => (
-              <label key={r} className="flex items-center gap-2 text-sm mb-1">
+              <label key={r} className="flex items-center gap-2 text-sm mb-1 dark:text-slate-300">
                 <input type="checkbox" checked={form.allowed_roles.includes(r)} onChange={() => toggleRole(r)} />
                 {roleLabel[r]}
               </label>
@@ -399,9 +399,9 @@ export default function TasksPage() {
 
           {/* Gender */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Cinsiyet Kısıtı</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">Cinsiyet Kısıtı</label>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.allowed_genders}
               onChange={e => setForm({ ...form, allowed_genders: e.target.value })}
             >
@@ -417,8 +417,8 @@ export default function TasksPage() {
           </label>
 
           {/* ── Schedule ── */}
-          <div className="border-t pt-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+          <div className="border-t dark:border-[#1E293B] pt-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">
               <input
                 type="checkbox"
                 checked={scheduleForm.enabled}
@@ -430,9 +430,9 @@ export default function TasksPage() {
             {scheduleForm.enabled && (
               <div className="flex flex-col gap-3 pl-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-600">Tekrarlama Sıklığı</label>
+                  <label className="text-xs font-medium text-gray-600 dark:text-slate-400">Tekrarlama Sıklığı</label>
                   <select
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-3 py-2 text-sm"
                     value={scheduleForm.frequency}
                     onChange={e => setScheduleForm(f => ({ ...f, frequency: e.target.value as Frequency, days_of_week: [] }))}
                   >
@@ -445,39 +445,39 @@ export default function TasksPage() {
                 {/* Günde N kez */}
                 {scheduleForm.frequency === 'multiple_daily' && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Günde</span>
+                    <span className="text-gray-600 dark:text-slate-400">Günde</span>
                     <input
                       type="number"
                       min={2}
                       max={24}
-                      className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-center"
+                      className="w-16 rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-2 py-1 text-sm text-center"
                       value={scheduleForm.times_per_day}
                       onChange={e => setScheduleForm(f => ({ ...f, times_per_day: Number(e.target.value) }))}
                     />
-                    <span className="text-gray-600">kez</span>
+                    <span className="text-gray-600 dark:text-slate-400">kez</span>
                   </div>
                 )}
 
                 {/* Her X saatte bir */}
                 {scheduleForm.frequency === 'interval_daily' && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Her</span>
+                    <span className="text-gray-600 dark:text-slate-400">Her</span>
                     <input
                       type="number"
                       min={1}
                       max={12}
-                      className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-center"
+                      className="w-16 rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-2 py-1 text-sm text-center"
                       value={scheduleForm.interval_hours}
                       onChange={e => setScheduleForm(f => ({ ...f, interval_hours: Number(e.target.value) }))}
                     />
-                    <span className="text-gray-600">saatte bir</span>
+                    <span className="text-gray-600 dark:text-slate-400">saatte bir</span>
                   </div>
                 )}
 
                 {/* Weekly day picker */}
                 {scheduleForm.frequency === 'weekly' && (
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Hangi günler?</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Hangi günler?</p>
                     <div className="flex gap-1 flex-wrap">
                       {DAYS.map((d, i) => (
                         <button
@@ -487,7 +487,7 @@ export default function TasksPage() {
                           className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
                             scheduleForm.days_of_week.includes(i)
                               ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                              : 'bg-white dark:bg-[#162543] text-gray-600 dark:text-slate-300 border-gray-300 dark:border-[#1E293B] hover:bg-gray-50 dark:hover:bg-[#192d4a]'
                           }`}
                         >
                           {d}
@@ -500,25 +500,25 @@ export default function TasksPage() {
                 {/* Monthly/Yearly day */}
                 {(scheduleForm.frequency === 'monthly' || scheduleForm.frequency === 'yearly') && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Her ayın</span>
+                    <span className="text-gray-600 dark:text-slate-400">Her ayın</span>
                     <input
                       type="number"
                       min={1}
                       max={31}
-                      className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-center"
+                      className="w-16 rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-2 py-1 text-sm text-center"
                       value={scheduleForm.month_day}
                       onChange={e => setScheduleForm(f => ({ ...f, month_day: Number(e.target.value) }))}
                     />
-                    <span className="text-gray-600">. günü</span>
+                    <span className="text-gray-600 dark:text-slate-400">. günü</span>
                   </div>
                 )}
 
                 {/* Yearly month */}
                 {scheduleForm.frequency === 'yearly' && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Ay:</span>
+                    <span className="text-gray-600 dark:text-slate-400">Ay:</span>
                     <select
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      className="rounded-md border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#162543] text-gray-900 dark:text-slate-100 px-2 py-1 text-sm"
                       value={scheduleForm.month}
                       onChange={e => setScheduleForm(f => ({ ...f, month: Number(e.target.value) }))}
                     >

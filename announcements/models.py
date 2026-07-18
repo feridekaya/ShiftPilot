@@ -20,6 +20,10 @@ class Announcement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    target_roles = models.JSONField(
+        default=list,
+        help_text='Boş = herkes. Örn: ["employee","supervisor"]'
+    )
 
     class Meta:
         ordering = ['-created_at']

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/layout/Navbar';
@@ -18,11 +18,14 @@ const managerLinks = [
   { href: '/manager/feedback',      label: 'Geri Bildirim' },
   { href: '/manager/performance', label: 'Performans' },
   { href: '/manager/audit',       label: 'Denetim'    },
+  { href: '/manager/activity',    label: 'Etkinlik'   },
+  { href: '/manager/trainings',  label: 'Eğitimler'  },
 ];
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -40,10 +43,10 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar links={managerLinks} />
+      <Sidebar links={managerLinks} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <Navbar onMenuToggle={() => setSidebarOpen(o => !o)} />
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-50 dark:bg-[#0A1128] transition-colors duration-200">{children}</main>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ export async function createAnnouncement(data: {
   title: string;
   content: string;
   priority: AnnouncementPriority;
+  target_roles?: string[];
 }): Promise<Announcement> {
   const response = await api.post<Announcement>('/api/announcements/', data);
   return response.data;
@@ -17,7 +18,7 @@ export async function createAnnouncement(data: {
 
 export async function updateAnnouncement(
   id: number,
-  data: { title?: string; content?: string; priority?: AnnouncementPriority; is_active?: boolean }
+  data: { title?: string; content?: string; priority?: AnnouncementPriority; target_roles?: string[]; is_active?: boolean }
 ): Promise<Announcement> {
   const response = await api.put<Announcement>(`/api/announcements/${id}/`, data);
   return response.data;

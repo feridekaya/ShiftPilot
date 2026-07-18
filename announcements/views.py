@@ -19,9 +19,19 @@ class IsManagerOrReadOnly(BasePermission):
 
 
 class AnnouncementListCreateView(generics.ListCreateAPIView):
-    queryset = Announcement.objects.filter(is_active=True)
     serializer_class = AnnouncementSerializer
     permission_classes = [IsManagerOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Announcement.objects.filter(is_active=True)
+        if user.role == 'manager':
+            return qs  # managers see all they created / all
+        # empty target_roles = everyone; otherwise check role is included
+        from django.db.models import Q
+        return qs.filter(
+            Q(target_roles=[]) | Q(target_roles__contains=user.role)
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import * as breakService from '@/services/breaks';
@@ -230,12 +230,12 @@ export default function ManagerBreaksPage() {
                   type="date"
                   value={summaryDate}
                   onChange={e => handleDateChange(e.target.value)}
-                  className="border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 />
                 <button
                   onClick={handleExport}
                   disabled={summary.length === 0}
-                  className="text-xs px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-600 disabled:opacity-40"
+                  className="text-xs px-2 py-1 border border-gray-300 dark:border-[#1E293B] rounded-md hover:bg-gray-50 dark:hover:bg-[#192d4a] text-gray-600 dark:text-slate-300 bg-white dark:bg-[#111E38] disabled:opacity-40"
                 >
                   ⬇ Excel
                 </button>
@@ -247,9 +247,9 @@ export default function ManagerBreaksPage() {
                 Bu tarihte mola kaydı yok
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-100 shadow overflow-hidden overflow-x-auto">
+              <div className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm min-w-[480px]">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                  <thead className="bg-gray-50 dark:bg-[#162543] text-xs text-gray-500 dark:text-slate-300 uppercase tracking-wider">
                     <tr>
                       <th className="px-4 py-3 text-left">Personel</th>
                       <th className="px-4 py-3 text-center">Yemek</th>
@@ -261,7 +261,7 @@ export default function ManagerBreaksPage() {
                     {summary.map((row, i) => {
                       const isLong = row.total_minutes > 35; // over limit threshold
                       return (
-                        <tr key={`${row.user_id}-${row.date}`} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <tr key={`${row.user_id}-${row.date}`} className={i % 2 === 0 ? 'bg-white dark:bg-[#111E38] dark:text-slate-100' : 'bg-gray-50 dark:bg-[#0A1128] dark:text-slate-100'}>
                           <td className="px-4 py-3 font-medium">
                             {ROLE_ICON[row.user_role]} {row.user_name}
                             <span className="text-[10px] text-gray-400 ml-1">{ROLE_LABEL[row.user_role]}</span>
@@ -284,10 +284,10 @@ export default function ManagerBreaksPage() {
                       );
                     })}
                   </tbody>
-                  <tfoot className="bg-gray-50 border-t border-gray-200">
+                  <tfoot className="bg-gray-50 dark:bg-[#162543] border-t border-gray-200 dark:border-[#1E293B]">
                     <tr>
-                      <td colSpan={3} className="px-4 py-2 text-xs text-gray-500 font-medium">Toplam</td>
-                      <td className="px-4 py-2 text-right text-xs font-bold text-gray-700 font-mono">
+                      <td colSpan={3} className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400 font-medium">Toplam</td>
+                      <td className="px-4 py-2 text-right text-xs font-bold text-gray-700 dark:text-slate-200 font-mono">
                         {summary.reduce((s, r) => s + r.total_minutes, 0).toFixed(1)} dk
                       </td>
                     </tr>
@@ -310,14 +310,14 @@ export default function ManagerBreaksPage() {
                 type="date"
                 value={avgRange.from}
                 onChange={e => setAvgRange(r => ({ ...r, from: e.target.value }))}
-                className="border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
               <span className="text-gray-400 text-xs">→</span>
               <input
                 type="date"
                 value={avgRange.to}
                 onChange={e => setAvgRange(r => ({ ...r, to: e.target.value }))}
-                className="border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="border border-gray-300 dark:border-[#1E293B] bg-white dark:bg-[#111E38] text-gray-900 dark:text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
               <button
                 onClick={() => loadAverages(avgRange.from, avgRange.to)}
@@ -337,8 +337,9 @@ export default function ManagerBreaksPage() {
               Bu aralıkta mola kaydı yok
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-100 shadow overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="bg-white dark:bg-[#111E38] rounded-xl border border-gray-100 dark:border-[#1E293B] shadow overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-gray-800 text-white text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3 text-left">Personel</th>
@@ -350,7 +351,7 @@ export default function ManagerBreaksPage() {
                 </thead>
                 <tbody>
                   {averages.map((row, i) => {
-                    const rowBg = (['bg-white', 'bg-[#f3f4f6]', 'bg-[#e5e7eb]'] as const)[i % 3];
+                    const rowBg = (['bg-white dark:bg-[#111E38]', 'bg-[#f3f4f6] dark:bg-[#0A1128]', 'bg-[#e5e7eb] dark:bg-[#111E38]'] as const)[i % 3];
                     const isHigh = row.avg_total_min > 60;
                     const isLow  = row.avg_total_min <= 30;
                     return (
@@ -380,16 +381,17 @@ export default function ManagerBreaksPage() {
                     );
                   })}
                 </tbody>
-                <tfoot className="bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+                <tfoot className="bg-gray-50 dark:bg-[#162543] border-t border-gray-200 dark:border-[#1E293B] text-xs text-gray-500 dark:text-slate-400">
                   <tr>
-                    <td colSpan={3} className="px-4 py-2 font-medium">Tüm personel ortalaması</td>
-                    <td className="px-4 py-2 text-right font-mono font-bold text-gray-700">
+                    <td colSpan={3} className="px-4 py-2 font-medium dark:text-slate-400">Tüm personel ortalaması</td>
+                    <td className="px-4 py-2 text-right font-mono font-bold text-gray-700 dark:text-slate-200">
                       {averages.length ? (averages.reduce((s, r) => s + r.avg_total_min, 0) / averages.length).toFixed(1) : '—'} dk
                     </td>
                     <td />
                   </tr>
                 </tfoot>
               </table>
+              </div>
             </div>
           )}
         </div>

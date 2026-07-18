@@ -80,6 +80,45 @@ class RejectionLog(models.Model):
         return f'Rejection of {self.assignment} by {self.rejected_by} at {self.rejected_at}'
 
 
+class ActivityLog(models.Model):
+    ACTION_CHOICES = [
+        ('assigned',    'Görev Atandı'),
+        ('bulk_assigned', 'Toplu Atama Yapıldı'),
+        ('reassigned',  'Görev Yeniden Atandı'),
+        ('completed',   'Görev Tamamlandı'),
+        ('approved',    'Görev Onaylandı'),
+        ('rejected',    'Görev Reddedildi'),
+        ('deleted',     'Atama Silindi'),
+    ]
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='activity_logs'
+    )
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    assignment = models.ForeignKey(
+        Assignment, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='activity_logs'
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='target_activity_logs'
+    )
+    # Denormalized strings so history survives even if records are deleted
+    actor_name = models.CharField(max_length=150, blank=True)
+    target_user_name = models.CharField(max_length=150, blank=True)
+    task_title = models.CharField(max_length=255, blank=True)
+    business_date = models.DateField(null=True, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.actor_name} → {self.action} ({self.created_at:%Y-%m-%d %H:%M})'
+
+
 class SubmissionPhoto(models.Model):
     submission = models.ForeignKey(TaskSubmission, on_delete=models.CASCADE, related_name='photos')
     photo_url = models.URLField()

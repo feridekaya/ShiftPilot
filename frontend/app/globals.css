@@ -2,21 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* LIGHT MODE (Varsayılan) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-app:         #F8FAFC;
+  --bg-card:        #FFFFFF;
+  --bg-task:        #FFFFFF;
+  --color-primary:  #0E2549;
+  --color-accent:   #4F46E5;
+  --text-main:      #0F172A;
+  --text-muted:     #475569;
+  --border-color:   #E2E8F0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* DARK MODE */
+[data-theme="dark"], .dark {
+  --bg-app:         #0A1128;
+  --bg-card:        #111E38;
+  --bg-task:        #1A2A4A;
+  --color-primary:  #1E3A8A;
+  --color-accent:   #6366F1;
+  --text-main:      #F8FAFC;
+  --text-muted:     #94A3B8;
+  --border-color:   #1E293B;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--text-main);
+  background: var(--bg-app);
   font-family: Arial, Helvetica, sans-serif;
 }
 

@@ -12,7 +12,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
         model = Feedback
         fields = [
             'id', 'category', 'category_display', 'content', 'is_anonymous',
-            'created_at', 'user_name', 'user_role',
+            'customer_rating', 'photo_url', 'created_at', 'user_name', 'user_role',
             'response', 'response_note', 'responded_by_name', 'responded_at',
         ]
         read_only_fields = [
