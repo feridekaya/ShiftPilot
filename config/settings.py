@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     'breaks',
     'announcements',
     'feedback',
+    'trainings',
+    'evaluations',
 ]
 
 MIDDLEWARE = [
@@ -99,26 +101,43 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.User'
 
-# ── Static files (WhiteNoise) ───────────────────────────────────────────────
+# ── Static files ────────────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ── Media / File Storage ────────────────────────────────────────────────────
-# Cloudflare R2 (S3-compatible) when R2_BUCKET_NAME is set, else local
 R2_BUCKET_NAME = os.getenv('R2_BUCKET_NAME')
+R2_PUBLIC_URL  = os.getenv('R2_PUBLIC_URL', '')   # pub-xxx.r2.dev (no https://)
 
 if R2_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    AWS_ACCESS_KEY_ID     = os.getenv('R2_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = R2_BUCKET_NAME
-    AWS_S3_ENDPOINT_URL   = os.getenv('R2_ENDPOINT_URL')   # https://<accountid>.r2.cloudflarestorage.com
-    AWS_S3_CUSTOM_DOMAIN  = os.getenv('R2_PUBLIC_URL')      # pub-xxx.r2.dev  (public bucket URL)
-    AWS_DEFAULT_ACL       = 'public-read'
-    AWS_S3_FILE_OVERWRITE = False
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/' if AWS_S3_CUSTOM_DOMAIN else f'{AWS_S3_ENDPOINT_URL}/{R2_BUCKET_NAME}/'
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'bucket_name':    R2_BUCKET_NAME,
+                'access_key':     os.getenv('R2_ACCESS_KEY_ID'),
+                'secret_key':     os.getenv('R2_SECRET_ACCESS_KEY'),
+                'endpoint_url':   os.getenv('R2_ENDPOINT_URL'),
+                'custom_domain':  R2_PUBLIC_URL or None,
+                'querystring_auth': False,
+                'default_acl':    None,
+                'file_overwrite': False,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    MEDIA_URL = f'https://{R2_PUBLIC_URL}/' if R2_PUBLIC_URL else f'{os.getenv("R2_ENDPOINT_URL")}/{R2_BUCKET_NAME}/'
 else:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
     MEDIA_URL  = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -145,6 +164,16 @@ if not DEBUG:
 
 # ── Business Day ────────────────────────────────────────────────────────────
 BUSINESS_DAY_CUTOFF_HOUR = int(os.getenv('BUSINESS_DAY_CUTOFF_HOUR', 4))
+
+# ── Email (Google Workspace SMTP) ───────────────────────────────────────────
+EMAIL_BACKEND    = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST       = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT       = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS    = True
+EMAIL_HOST_USER  = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL  = os.getenv('DEFAULT_FROM_EMAIL', 'ShiftPilot <info@appshiftpilot.com>')
+FRONTEND_URL     = os.getenv('FRONTEND_URL', 'https://appshiftpilot.com')
 
 # ── Celery ──────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL    = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

@@ -132,6 +132,8 @@ export interface Feedback {
   category_display: string;
   content: string;
   is_anonymous: boolean;
+  customer_rating: number | null;
+  photo_url: string;
   created_at: string;
   user_name: string;
   user_role: Role;
@@ -148,6 +150,7 @@ export interface Announcement {
   title: string;
   content: string;
   priority: AnnouncementPriority;
+  target_roles: Role[];
   created_by: number;
   created_by_name: string;
   created_by_role: Role;
@@ -158,4 +161,47 @@ export interface Announcement {
   total_users: number;
   is_read_by_me: boolean;
   readers: { id: number; name: string; role: string }[];
+}
+
+export interface DailyEmployee {
+  id: number;
+  name: string;
+  role: Role;
+  gender: Gender | null;
+  evaluated: boolean;
+  evaluation_id?: number;
+  evaluator_name?: string;
+  avg_score?: number;
+}
+
+export interface EmployeeEvaluation {
+  id: number;
+  evaluatee: number;
+  evaluatee_name: string;
+  evaluator: number | null;
+  evaluator_name: string;
+  date: string;
+  punctuality: number;
+  break_compliance: number;
+  customer_comm: number;
+  speed_agility: number;
+  teamwork: number;
+  hygiene_uniform: number;
+  problem_solving: number;
+  feedback_openness: number;
+  energy_motivation: number;
+  note: string;
+  created_at: string;
+}
+
+export interface Training {
+  id: number;
+  title: string;
+  description: string;
+  pdf_url: string;
+  visible_to: Role[];
+  uploaded_by: number | null;
+  uploaded_by_name: string;
+  created_at: string;
+  is_active: boolean;
 }
