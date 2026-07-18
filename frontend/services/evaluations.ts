@@ -1,8 +1,13 @@
 import api from './api';
-import { DailyEmployee, EmployeeEvaluation } from '@/types';
+import { DailyEmployee, EmployeeEvaluation, EvaluationSummary } from '@/types';
 
 export async function getDailyEmployees(date: string): Promise<DailyEmployee[]> {
   const { data } = await api.get<DailyEmployee[]>('/api/evaluations/daily-employees/', { params: { date } });
+  return data;
+}
+
+export async function getEvaluationSummary(params: { date_from?: string; date_to?: string }): Promise<EvaluationSummary[]> {
+  const { data } = await api.get<EvaluationSummary[]>('/api/evaluations/summary/', { params });
   return data;
 }
 
