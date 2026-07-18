@@ -163,6 +163,22 @@ export interface Announcement {
   readers: { id: number; name: string; role: string }[];
 }
 
+export interface EvaluationSummary {
+  employee_id: number;
+  employee_name: string;
+  eval_count: number;
+  avg_total: number;
+  avg_punctuality: number;
+  avg_break_compliance: number;
+  avg_customer_comm: number;
+  avg_speed_agility: number;
+  avg_teamwork: number;
+  avg_hygiene_uniform: number;
+  avg_problem_solving: number;
+  avg_feedback_openness: number;
+  avg_energy_motivation: number;
+}
+
 export interface DailyEmployee {
   id: number;
   name: string;

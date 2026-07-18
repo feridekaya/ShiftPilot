@@ -112,3 +112,67 @@ class EmployeeEvaluationDetailView(generics.RetrieveAPIView):
     serializer_class = EmployeeEvaluationSerializer
     permission_classes = [IsAuthenticated]
     queryset = EmployeeEvaluation.objects.select_related('evaluatee', 'evaluator')
+
+
+class EvaluationSummaryView(APIView):
+    """
+    GET /api/evaluations/summary/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    Returns per-employee aggregated avg scores across the date range.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ('manager', 'supervisor'):
+            return Response({'detail': 'Yetkisiz.'}, status=status.HTTP_403_FORBIDDEN)
+
+        from django.db.models import Avg, Count
+
+        qs = EmployeeEvaluation.objects.select_related('evaluatee')
+        date_from_str = request.query_params.get('date_from')
+        date_to_str   = request.query_params.get('date_to')
+        if date_from_str:
+            try:
+                qs = qs.filter(date__gte=date_type.fromisoformat(date_from_str))
+            except ValueError:
+                pass
+        if date_to_str:
+            try:
+                qs = qs.filter(date__lte=date_type.fromisoformat(date_to_str))
+            except ValueError:
+                pass
+
+        rows = qs.values('evaluatee__id', 'evaluatee__name').annotate(
+            eval_count=Count('id'),
+            avg_punctuality=Avg('punctuality'),
+            avg_break_compliance=Avg('break_compliance'),
+            avg_customer_comm=Avg('customer_comm'),
+            avg_speed_agility=Avg('speed_agility'),
+            avg_teamwork=Avg('teamwork'),
+            avg_hygiene_uniform=Avg('hygiene_uniform'),
+            avg_problem_solving=Avg('problem_solving'),
+            avg_feedback_openness=Avg('feedback_openness'),
+            avg_energy_motivation=Avg('energy_motivation'),
+        )
+
+        FIELDS = [
+            'avg_punctuality', 'avg_break_compliance', 'avg_customer_comm',
+            'avg_speed_agility', 'avg_teamwork', 'avg_hygiene_uniform',
+            'avg_problem_solving', 'avg_feedback_openness', 'avg_energy_motivation',
+        ]
+
+        result = []
+        for r in rows:
+            vals = [r[f] or 0 for f in FIELDS]
+            avg_total = sum(vals) / len(vals)
+            entry = {
+                'employee_id':   r['evaluatee__id'],
+                'employee_name': r['evaluatee__name'],
+                'eval_count':    r['eval_count'],
+                'avg_total':     round(avg_total, 2),
+            }
+            for f in FIELDS:
+                entry[f] = round(r[f] or 0, 2)
+            result.append(entry)
+
+        result.sort(key=lambda x: x['avg_total'], reverse=True)
+        return Response(result)
