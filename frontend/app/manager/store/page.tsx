@@ -32,9 +32,9 @@ function buildZoneData(assignments: Assignment[]): ZoneData {
 }
 
 const SECTIONS = [
-  { key: 'opening', label: 'Açılış',  sublabel: 'Opening', dot: 'bg-amber-400', ring: 'ring-amber-500/20', countColor: 'text-amber-400' },
-  { key: 'shift',   label: 'Sorumluluk Bölgesi', sublabel: 'Responsibility', dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
-  { key: 'closing', label: 'Kapanış', sublabel: 'Closing', dot: 'bg-rose-400',   ring: 'ring-rose-500/20',  countColor: 'text-rose-400'  },
+  { key: 'opening', label: 'Açılış',            dot: 'bg-amber-400',  ring: 'ring-amber-500/20',  countColor: 'text-amber-400'  },
+  { key: 'shift',   label: 'Sorumluluk Bölgesi', dot: 'bg-indigo-400', ring: 'ring-indigo-500/20', countColor: 'text-indigo-400' },
+  { key: 'closing', label: 'Kapanış',            dot: 'bg-rose-400',   ring: 'ring-rose-500/20',   countColor: 'text-rose-400'   },
 ] as const;
 
 export default function StorePage() {
@@ -164,7 +164,6 @@ export default function StorePage() {
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2">
                     <h2 className="text-gray-900 dark:text-white font-bold text-lg leading-none">{section.label}</h2>
-                    <span className="text-gray-500 dark:text-slate-600 text-xs">{section.sublabel}</span>
                   </div>
                   <p className={`text-xs mt-0.5 ${section.countColor}`}>
                     {staffCount > 0 ? `${staffCount} personel aktif` : 'Personel atanmadı'}
