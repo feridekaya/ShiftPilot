@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from assignments.models import Assignment
+from tasks.models import WorkSchedule
 from users.models import User
 from .models import EmployeeEvaluation
 from .serializers import EmployeeEvaluationSerializer
@@ -14,8 +14,8 @@ from .serializers import EmployeeEvaluationSerializer
 class DailyEmployeeListView(APIView):
     """
     GET /api/evaluations/daily-employees/?date=YYYY-MM-DD
-    Returns distinct employees who have assignments on the given date,
-    with a flag indicating whether they have already been evaluated that day.
+    Returns employees scheduled to work (is_off=False in WorkSchedule) on the given date.
+    Falls back to employees with assignments if no schedule entries exist for that date.
     """
     permission_classes = [IsAuthenticated]
 
@@ -32,12 +32,25 @@ class DailyEmployeeListView(APIView):
         else:
             target_date = date_type.today()
 
-        employee_ids = (
-            Assignment.objects
-            .filter(date=target_date, user__role='employee', user__is_active=True)
+        # Primary source: WorkSchedule (çizelge) — employees not on off day
+        schedule_ids = (
+            WorkSchedule.objects
+            .filter(date=target_date, is_off=False, user__role='employee', user__is_active=True)
             .values_list('user_id', flat=True)
             .distinct()
         )
+
+        if schedule_ids:
+            employee_ids = list(schedule_ids)
+        else:
+            # Fallback: employees with assignments that day
+            from assignments.models import Assignment
+            employee_ids = list(
+                Assignment.objects
+                .filter(date=target_date, user__role='employee', user__is_active=True)
+                .values_list('user_id', flat=True)
+                .distinct()
+            )
 
         evaluated_ids = set(
             EmployeeEvaluation.objects
