@@ -175,6 +175,19 @@ export default function LandingPage() {
             Kaosu bitirir — personelin verimliliğini ve dükkanın huzurunu herkes görür.
           </p>
 
+          <div className="flex items-center gap-2 mb-6">
+            {[
+              { icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="3" width="20" height="14" rx="2" strokeLinecap="round" strokeLinejoin="round"/><path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8M12 17v4"/></svg>, label: 'Masaüstü' },
+              { icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="5" y="2" width="14" height="20" rx="2" strokeLinecap="round" strokeLinejoin="round"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01"/></svg>, label: 'Mobil' },
+              { icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="4" width="20" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01"/></svg>, label: 'Tablet' },
+            ].map((d, i) => (
+              <div key={i} className="flex items-center gap-1.5 bg-[#0e2549] border border-[#1a3a6b] text-slate-400 text-xs font-semibold px-3 py-1.5 rounded-full">
+                {d.icon}
+                {d.label}
+              </div>
+            ))}
+          </div>
+
           <ul className="flex flex-col gap-3 text-sm text-slate-400">
             {[
               'Fotoğraflı görev tamamlama — galeri yasağı, sadece kamera',
@@ -209,6 +222,159 @@ export default function LandingPage() {
               <p className="text-sm text-slate-400 leading-relaxed">{card.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* CROSS-DEVICE */}
+      <section className="max-w-6xl mx-auto px-6 pb-20">
+        <div className="bg-gradient-to-br from-[#0d2244] via-[#0e2549] to-[#071a35] border border-[#1a3a6b] rounded-3xl overflow-hidden">
+          <div className="grid md:grid-cols-2 gap-0 items-center">
+
+            {/* Sol — metin */}
+            <div className="p-10 md:p-14">
+              <div className="inline-flex items-center gap-2 bg-[#071a35] border border-[#1a3a6b] text-indigo-400 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
+                Masaüstü &amp; Mobil
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4 leading-tight">
+                Masaüstünde de,<br className="hidden sm:block" /> cebinizde de çalışır
+              </h2>
+              <p className="text-slate-400 leading-relaxed mb-8 text-base">
+                ShiftPilot kurulum gerektirmez — tarayıcı üzerinden her cihazda açılır.
+                Yönetici geniş ekranda planlar, personel telefondan tamamlar.
+              </p>
+              <div className="space-y-5">
+                {[
+                  {
+                    icon: (
+                      <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <rect x="2" y="3" width="20" height="14" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8M12 17v4" />
+                      </svg>
+                    ),
+                    label: 'Masaüstü / Dizüstü',
+                    desc: 'Yönetici ve şef paneli için tam ekran deneyimi — çizelge, atama ve raporlar büyük ekranda.',
+                  },
+                  {
+                    icon: (
+                      <svg className="w-5 h-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <rect x="5" y="2" width="14" height="20" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01" />
+                      </svg>
+                    ),
+                    label: 'Akıllı Telefon',
+                    desc: 'Personel görevlerini telefondan görür, kamera ile fotoğraf çekip anında teslim eder.',
+                  },
+                  {
+                    icon: (
+                      <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <rect x="2" y="4" width="20" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01" />
+                      </svg>
+                    ),
+                    label: 'Tablet',
+                    desc: 'Mutfak tezgahına ya da kasaya sabitlenmiş tablet ekranlar için de mükemmel uyum.',
+                  },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-4">
+                    <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white mb-0.5">{item.label}</div>
+                      <div className="text-sm text-slate-400 leading-relaxed">{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sağ — cihaz görseli */}
+            <div className="hidden md:flex items-center justify-center p-10 relative min-h-[400px]">
+              {/* Laptop */}
+              <div className="relative z-10">
+                {/* Screen */}
+                <div className="w-72 bg-[#051228] rounded-t-xl border border-[#1a3a6b] overflow-hidden">
+                  {/* Tarayıcı bar */}
+                  <div className="bg-[#071a35] px-3 py-2 flex items-center gap-1.5 border-b border-[#1a3a6b]">
+                    <div className="w-2 h-2 rounded-full bg-red-500/50" />
+                    <div className="w-2 h-2 rounded-full bg-yellow-500/50" />
+                    <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+                    <div className="flex-1 mx-2 bg-[#0e2549] rounded text-[9px] text-slate-500 text-center py-0.5 border border-[#1a3a6b]">
+                      appshiftpilot.com
+                    </div>
+                  </div>
+                  {/* App içeriği */}
+                  <div className="p-3 bg-[#0A1128]">
+                    {/* Sidebar + main */}
+                    <div className="flex gap-2">
+                      <div className="w-14 flex flex-col gap-1.5">
+                        <div className="h-6 bg-[#0e2549] rounded-lg border border-[#1a3a6b]" />
+                        {['bg-indigo-600','bg-[#0e2549]','bg-[#0e2549]','bg-[#0e2549]'].map((bg, i) => (
+                          <div key={i} className={`h-4 ${bg} rounded border border-[#1a3a6b]`} />
+                        ))}
+                      </div>
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <div className="h-4 bg-[#0e2549] rounded border border-[#1a3a6b]" />
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {[...Array(4)].map((_, i) => (
+                            <div key={i} className="h-12 bg-[#0e2549] rounded-lg border border-[#1a3a6b] p-1.5">
+                              <div className="h-1.5 bg-indigo-600/60 rounded mb-1 w-3/4" />
+                              <div className="h-1.5 bg-slate-600/50 rounded w-1/2" />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-1.5">
+                          {[...Array(3)].map((_, i) => (
+                            <div key={i} className="flex-1 h-8 bg-[#0e2549] rounded-lg border border-[#1a3a6b] p-1.5">
+                              <div className={`h-2.5 rounded text-center text-[7px] flex items-center justify-center font-bold ${i===0?'bg-emerald-900/60 text-emerald-400':i===1?'bg-yellow-900/60 text-yellow-400':'bg-indigo-900/60 text-indigo-400'}`}>
+                                {['✓ 8','⏳ 4','∑ 12'][i]}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Laptop alt kısmı */}
+                <div className="w-80 h-3 bg-[#0a1a35] rounded-b-xl -ml-4 border border-t-0 border-[#1a3a6b]" />
+              </div>
+
+              {/* Telefon — sağ altta örtüşen */}
+              <div className="absolute bottom-8 right-6 z-20 w-24">
+                <div className="bg-[#051228] rounded-[18px] border-2 border-[#1a3a6b] overflow-hidden shadow-2xl shadow-indigo-900/30">
+                  {/* Notch */}
+                  <div className="flex justify-center pt-1.5 pb-1 bg-[#071a35]">
+                    <div className="w-8 h-1 bg-[#0e2549] rounded-full" />
+                  </div>
+                  {/* Ekran içeriği */}
+                  <div className="bg-[#0A1128] p-2 pb-3 flex flex-col gap-1.5">
+                    <div className="h-3 bg-[#0e2549] rounded border border-[#1a3a6b]" />
+                    {[
+                      { c: 'bg-emerald-900/60 text-emerald-400', t: 'Onaylandı' },
+                      { c: 'bg-yellow-900/60 text-yellow-400',   t: 'Bekliyor'  },
+                      { c: 'bg-blue-900/60 text-blue-400',       t: 'Tamamlandı'},
+                    ].map((r, i) => (
+                      <div key={i} className="bg-[#0e2549] rounded-lg border border-[#1a3a6b] p-1.5">
+                        <div className="h-1.5 bg-slate-600/50 rounded mb-1 w-2/3" />
+                        <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${r.c}`}>{r.t}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Home bar */}
+                  <div className="flex justify-center pb-1.5 bg-[#0A1128]">
+                    <div className="w-6 h-0.5 bg-slate-600 rounded-full" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Arka dekoratif glow */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl" />
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
