@@ -521,7 +521,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Assignment.objects.select_related(
             'user', 'task', 'shift', 'zone', 'assigned_by'
-        )
+        ).prefetch_related('submission_set', 'submission_set__photos')
+
         user = self.request.user
         if user.role == 'employee':
             qs = qs.filter(user=user)
@@ -529,9 +530,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
+
         date_filter = self.request.query_params.get('date')
+        # Default to today so we never load the full history unpaged
         if date_filter:
             qs = qs.filter(date=date_filter)
+        else:
+            qs = qs.filter(date=get_business_date())
+
         return qs.order_by('-date')
 
     @action(detail=False, methods=['post'], url_path='bulk')
@@ -716,7 +722,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         qs = TaskSubmission.objects.select_related(
             'assignment__user', 'assignment__task', 'assignment__zone',
             'assignment__shift', 'approved_by'
-        )
+        ).prefetch_related('photos')
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(approval_status=status_filter)
@@ -726,6 +732,12 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         user_id = self.request.query_params.get('user_id')
         if user_id:
             qs = qs.filter(assignment__user_id=user_id)
+        date_filter = self.request.query_params.get('date')
+        if date_filter:
+            qs = qs.filter(assignment__date=date_filter)
+        elif not assignment_id and not user_id:
+            # Tarih ve filtre olmadan tüm geçmişi çekmemek için bugünle sınırla
+            qs = qs.filter(assignment__date=get_business_date())
         return qs.order_by('-submitted_at')
 
     def get_serializer_context(self):
