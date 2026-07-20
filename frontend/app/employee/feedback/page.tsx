@@ -100,7 +100,7 @@ export default function EmployeeFeedbackPage() {
       <div className="flex items-center justify-between mb-7">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Geri Bildirim</h1>
-          <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">Düşüncelerini yönetiminle paylaş</p>
+          <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">Müşterilerin fikirlerini yönetiminle paylaş</p>
         </div>
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 shadow-sm">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
