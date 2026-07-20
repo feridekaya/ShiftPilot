@@ -48,10 +48,10 @@ type SortKey = keyof UserPerformance;
 type Tab = 'all' | 'workforce' | 'feedback' | 'evaluations';
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'all',         label: 'Tümü'                   },
-  { key: 'workforce',   label: 'İş Gücü'                },
-  { key: 'feedback',    label: 'Feedback Yönetimi'      },
-  { key: 'evaluations', label: 'Personel Değerlendirme' },
+  { key: 'all',         label: 'Tümü'           },
+  { key: 'workforce',   label: 'İş Gücü'        },
+  { key: 'feedback',    label: 'Feedback'        },
+  { key: 'evaluations', label: 'Değerlendirme'  },
 ];
 
 const EVAL_COLS: { key: keyof EvaluationSummary; label: string }[] = [
@@ -197,17 +197,19 @@ export default function PerformancePage() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 p-1 bg-slate-100 dark:bg-[#111E38] rounded-xl w-full sm:w-fit border border-slate-200 dark:border-[#1E293B]">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              tab === t.key
-                ? 'bg-white dark:bg-[#1E3A8A] text-indigo-700 dark:text-indigo-200 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}>
-            {t.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto w-full pb-0.5">
+        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-[#111E38] rounded-xl w-fit min-w-full sm:min-w-0 border border-slate-200 dark:border-[#1E293B]">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                tab === t.key
+                  ? 'bg-white dark:bg-[#1E3A8A] text-indigo-700 dark:text-indigo-200 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
