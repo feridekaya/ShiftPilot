@@ -5,17 +5,40 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type Frequency = 'multiple_daily' | 'interval_daily' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type TaskCategory = 'opening' | 'closing' | 'responsibility' | 'general' | 'special';
 
+export interface Tenant {
+  id: number;
+  name: string;
+  license_limit: number;
+  active_user_count: number;
+  seats_remaining: number;
+}
+
+export interface JobRole {
+  id: number;
+  name: string;
+  base_role: Role;
+  unit: Unit | null;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   role: Role;
   gender: Gender | null;
+  unit: Unit | null;
+  job_role: JobRole | null;
   is_active: boolean;
   created_at: string;
 }
 
 export interface Zone {
+  id: number;
+  name: string;
+  description: string;
+}
+
+export interface Unit {
   id: number;
   name: string;
   description: string;
@@ -44,6 +67,7 @@ export interface Task {
   description: string;
   category: TaskCategory;
   zone: Zone | null;
+  unit: Unit | null;
   requires_photo: boolean;
   coefficient: number;
   allowed_roles: Role[];
@@ -121,6 +145,8 @@ export interface AuthUser {
   email: string;
   role: Role;
   gender: Gender | null;
+  unit: Unit | null;
+  job_role: JobRole | null;
 }
 
 export type FeedbackCategory = 'temizlik' | 'yemekler' | 'iecekler' | 'duzen' | 'ses' | 'personel' | 'genel' | 'diger';
@@ -151,6 +177,7 @@ export interface Announcement {
   content: string;
   priority: AnnouncementPriority;
   target_roles: Role[];
+  unit: Unit | null;
   created_by: number;
   created_by_name: string;
   created_by_role: Role;
@@ -216,6 +243,7 @@ export interface Training {
   description: string;
   pdf_url: string;
   visible_to: Role[];
+  unit: Unit | null;
   uploaded_by: number | null;
   uploaded_by_name: string;
   created_at: string;

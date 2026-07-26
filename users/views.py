@@ -1,9 +1,12 @@
+from django.conf import settings
 from rest_framework import generics, viewsets, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import User, EmailVerificationToken, PasswordResetToken
+from tenants.models import Tenant
+from .models import User, EmailVerificationToken, PasswordResetToken, Role
 from .permissions import IsManager, IsManagerOrSupervisor
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -11,8 +14,16 @@ from .serializers import (
     UserSerializer,
     UserCreateSerializer,
     UserUpdateSerializer,
+    RoleSerializer,
 )
 from .email_utils import send_verification_email, send_password_reset_email
+
+DEFAULT_TRIAL_LICENSE_LIMIT = getattr(settings, 'DEFAULT_TRIAL_LICENSE_LIMIT', 5)
+
+LICENSE_LIMIT_MESSAGE = (
+    'Lisans limitine ulaşıldı. Paketinizdeki kullanıcı kotasını doldurdunuz. '
+    'Ekibinize yeni personel eklemek için lisans limitinizi yükseltin.'
+)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -26,15 +37,22 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         is_public = not self.request.user or not self.request.user.is_authenticated
         if is_public:
-            # Public registration: require email verification
-            user = serializer.save(role='manager', is_active=False)
+            # Public registration: creates a brand-new business (tenant) with this
+            # user as its first manager, and requires email verification.
+            business_name = self.request.data.get('business_name', '').strip() or f"{serializer.validated_data.get('name', '')} İşletmesi"
+            tenant = Tenant.objects.create(name=business_name, license_limit=DEFAULT_TRIAL_LICENSE_LIMIT)
+            user = serializer.save(tenant=tenant, role='manager', is_active=False)
             token_obj = EmailVerificationToken.objects.create(user=user)
             try:
                 send_verification_email(user, token_obj.token)
             except Exception:
                 pass
         else:
-            serializer.save()
+            tenant = self.request.user.tenant
+            is_active = serializer.validated_data.get('is_active', True)
+            if is_active and not tenant.has_seat_available():
+                raise ValidationError({'detail': LICENSE_LIMIT_MESSAGE})
+            serializer.save(tenant=tenant)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -137,7 +155,13 @@ class LogoutView(APIView):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all().order_by('name')
+    def get_queryset(self):
+        qs = User.objects.filter(tenant=self.request.user.tenant)
+        if self.request.user.role == 'supervisor':
+            if not self.request.user.unit_id:
+                return qs.none()
+            qs = qs.filter(unit_id=self.request.user.unit_id)
+        return qs.order_by('name')
 
     def get_permissions(self):
         if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
@@ -151,3 +175,31 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ('update', 'partial_update'):
             return UserUpdateSerializer
         return UserSerializer
+
+    def perform_create(self, serializer):
+        tenant = self.request.user.tenant
+        is_active = serializer.validated_data.get('is_active', True)
+        if is_active and not tenant.has_seat_available():
+            raise ValidationError({'detail': LICENSE_LIMIT_MESSAGE})
+        serializer.save(tenant=tenant)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        was_active = instance.is_active
+        will_be_active = serializer.validated_data.get('is_active', was_active)
+        if will_be_active and not was_active and not instance.tenant.has_seat_available():
+            raise ValidationError({'detail': LICENSE_LIMIT_MESSAGE})
+        serializer.save()
+
+
+class RoleViewSet(viewsets.ModelViewSet):
+    """Özelleştirilebilir Rol (iş unvanı) listesi — sadece yönetici yönetir."""
+    serializer_class = RoleSerializer
+    permission_classes = [IsAuthenticated, IsManager]
+    http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return Role.objects.filter(tenant=self.request.user.tenant).order_by('name')
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.user.tenant)

@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('api/auth/password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     # Resources
+    path('api/tenants/', include('tenants.urls')),
     path('api/users/', include('users.urls')),
     path('api/tasks/', include('tasks.urls')),
     path('api/assignments/', include('assignments.urls')),

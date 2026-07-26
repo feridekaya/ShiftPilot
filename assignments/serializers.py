@@ -47,6 +47,15 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'assigned_by', 'submissions',
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['user_id'].queryset = User.objects.filter(tenant=tenant)
+            self.fields['task_id'].queryset = Task.objects.filter(tenant=tenant)
+            self.fields['shift_id'].queryset = Shift.objects.filter(tenant=tenant)
+            self.fields['zone_id'].queryset = Zone.objects.filter(tenant=tenant)
+
     def get_times_per_day(self, obj):
         try:
             sch = obj.task.schedule
@@ -80,13 +89,13 @@ class AssignmentSerializer(serializers.ModelSerializer):
         if not (user and task and date):
             return data
 
-        existing_qs = Assignment.objects.filter(user=user, date=date)
+        existing_qs = Assignment.objects.filter(tenant=user.tenant, user=user, date=date)
         current_workload = existing_qs.aggregate(total=Sum('task__coefficient'))['total'] or 0
         new_workload = current_workload + task.coefficient
 
         avg_result = (
             Assignment.objects
-            .filter(date=date)
+            .filter(tenant=user.tenant, date=date)
             .values('user')
             .annotate(total=Sum('task__coefficient'))
             .aggregate(avg=Avg('total'))
@@ -151,6 +160,12 @@ class TaskSubmissionSerializer(serializers.ModelSerializer):
             'staff_note', 'submitted_at',
             'business_date', 'approved_by', 'approval_status', 'note', 'rating',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['assignment_id'].queryset = Assignment.objects.filter(tenant=tenant)
 
     def validate(self, data):
         request = self.context.get('request')

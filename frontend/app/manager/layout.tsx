@@ -11,7 +11,7 @@ const managerLinks = [
   { href: '/manager/schedule', label: 'Çizelge' },
   { href: '/manager/users', label: 'Kullanıcılar' },
   { href: '/manager/tasks', label: 'Görevler' },
-  { href: '/manager/zones', label: 'Bölgeler' },
+  { href: '/manager/zones', label: 'Düzen' },
   { href: '/manager/assignments', label: 'Atamalar' },
   { href: '/manager/breaks', label: 'Molalar' },
   { href: '/manager/announcements', label: 'Duyurular' },

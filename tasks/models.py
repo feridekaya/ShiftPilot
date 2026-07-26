@@ -3,6 +3,18 @@ from django.conf import settings
 
 
 class Zone(models.Model):
+    """Fiziksel konum (görevlerin nerede yapıldığı) — Ön Kasa, Mutfak vb."""
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='zones')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Unit(models.Model):
+    """Organizasyonel birim (personelin bağlı olduğu ekip) — Mutfak Ekibi, Bar Ekibi vb."""
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='units')
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
 
@@ -11,6 +23,7 @@ class Zone(models.Model):
 
 
 class Shift(models.Model):
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='shifts')
     name = models.CharField(max_length=100)
     start_time = models.TimeField()
     end_time = models.TimeField()
@@ -28,10 +41,12 @@ class Task(models.Model):
         ('special',           'Özel'),
     ]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='tasks')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
     zone = models.ForeignKey(Zone, on_delete=models.SET_NULL, null=True, related_name='tasks')
+    unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks')
     requires_photo = models.BooleanField(default=True)
     coefficient = models.PositiveIntegerField(default=1)
     allowed_roles = models.JSONField(default=list)

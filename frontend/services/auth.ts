@@ -13,12 +13,16 @@ export async function login(email: string, password: string): Promise<AuthRespon
 }
 
 export async function register(payload: {
+  business_name: string;
   name: string;
   email: string;
   password: string;
   gender?: string;
 }): Promise<void> {
-  await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/register/`, payload);
+  await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/register/`, {
+    ...payload,
+    role: 'manager',
+  });
 }
 
 export async function getMe(): Promise<AuthUser> {

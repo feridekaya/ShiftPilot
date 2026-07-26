@@ -10,8 +10,10 @@ export async function createUser(payload: {
   name: string;
   email: string;
   password: string;
-  role: string;
+  role?: string;
   gender?: string;
+  unit_id?: number | null;
+  job_role_id?: number;
   is_active?: boolean;
 }): Promise<User> {
   const { data } = await api.post<User>('/api/users/', payload);
@@ -20,7 +22,10 @@ export async function createUser(payload: {
 
 export async function updateUser(
   id: number,
-  payload: Partial<{ name: string; email: string; password: string; role: string; gender: string; is_active: boolean }>
+  payload: Partial<{
+    name: string; email: string; password: string; role: string; gender: string;
+    unit_id: number | null; job_role_id: number; is_active: boolean;
+  }>
 ): Promise<User> {
   const { data } = await api.put<User>(`/api/users/${id}/`, payload);
   return data;

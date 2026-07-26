@@ -1,6 +1,25 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import User
+from tasks.models import Unit
+from tasks.serializers import UnitSerializer
+from .models import User, Role
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    unit = UnitSerializer(read_only=True)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True, allow_null=True, required=False
+    )
+
+    class Meta:
+        model = Role
+        fields = ['id', 'name', 'base_role', 'unit', 'unit_id']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['unit_id'].queryset = Unit.objects.filter(tenant=tenant)
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -24,35 +43,93 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    unit = UnitSerializer(read_only=True)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True, allow_null=True, required=False
+    )
+    job_role = RoleSerializer(read_only=True)
+    job_role_id = serializers.PrimaryKeyRelatedField(
+        queryset=Role.objects.all(), source='job_role', write_only=True, allow_null=True, required=False
+    )
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'is_active', 'created_at']
+        fields = [
+            'id', 'name', 'email', 'password', 'role', 'gender',
+            'unit', 'unit_id', 'job_role', 'job_role_id', 'is_active', 'created_at',
+        ]
         read_only_fields = ['id', 'created_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['unit_id'].queryset = Unit.objects.filter(tenant=tenant)
+            self.fields['job_role_id'].queryset = Role.objects.filter(tenant=tenant)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True, allow_null=True, required=False
+    )
+    job_role_id = serializers.PrimaryKeyRelatedField(
+        queryset=Role.objects.all(), source='job_role', write_only=True, allow_null=True, required=False
+    )
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'is_active']
+        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'unit_id', 'job_role_id', 'is_active']
         read_only_fields = ['id']
+        extra_kwargs = {'role': {'required': False}}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['unit_id'].queryset = Unit.objects.filter(tenant=tenant)
+            self.fields['job_role_id'].queryset = Role.objects.filter(tenant=tenant)
 
     def create(self, validated_data):
+        job_role = validated_data.get('job_role')
+        if job_role is not None:
+            validated_data['role'] = job_role.base_role
+            if job_role.unit_id:
+                validated_data['unit'] = job_role.unit
+        elif not validated_data.get('role'):
+            raise serializers.ValidationError({'role': 'Rol veya Yetki belirtilmeli.'})
         return User.objects.create_user(**validated_data)
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True, allow_null=True, required=False
+    )
+    job_role_id = serializers.PrimaryKeyRelatedField(
+        queryset=Role.objects.all(), source='job_role', write_only=True, allow_null=True, required=False
+    )
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'is_active']
+        fields = ['id', 'name', 'email', 'password', 'role', 'gender', 'unit_id', 'job_role_id', 'is_active']
         read_only_fields = ['id']
+        extra_kwargs = {'role': {'required': False}}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['unit_id'].queryset = Unit.objects.filter(tenant=tenant)
+            self.fields['job_role_id'].queryset = Role.objects.filter(tenant=tenant)
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
+        job_role = validated_data.get('job_role')
+        if job_role is not None:
+            validated_data['role'] = job_role.base_role
+            if job_role.unit_id:
+                validated_data['unit'] = job_role.unit
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:

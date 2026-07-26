@@ -11,7 +11,8 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import User
-from tasks.models import Task, Zone, Shift
+from tasks.models import Task, Zone, Unit, Shift
+from tenants.models import Tenant
 from .models import Assignment, TaskSubmission, RejectionLog
 
 
@@ -30,24 +31,29 @@ class TaskFlowTestCase(APITestCase):
         self.today = date.today().isoformat()
 
         # Kullanıcılar
+        self.tenant = Tenant.objects.create(name='Test İşletme', license_limit=100)
+        self.zone = Zone.objects.create(name='Ön Kasa', tenant=self.tenant)
+        self.unit = Unit.objects.create(name='Ön Kasa Ekibi', tenant=self.tenant)
         self.manager = User.objects.create_user(
-            email='manager@test.com', password='pass', name='Müdür', role='manager'
+            email='manager@test.com', password='pass', name='Müdür', role='manager', tenant=self.tenant
         )
         self.supervisor = User.objects.create_user(
-            email='supervisor@test.com', password='pass', name='Şef', role='supervisor'
+            email='supervisor@test.com', password='pass', name='Şef', role='supervisor', tenant=self.tenant,
+            unit=self.unit,
         )
         self.employee = User.objects.create_user(
-            email='employee@test.com', password='pass', name='Personel', role='employee'
+            email='employee@test.com', password='pass', name='Personel', role='employee', tenant=self.tenant,
+            unit=self.unit,
         )
 
-        # Görev, bölge, vardiya
-        self.zone = Zone.objects.create(name='Ön Kasa')
-        self.shift = Shift.objects.create(name='Sabah', start_time='09:00', end_time='18:00')
+        # Görev, vardiya
+        self.shift = Shift.objects.create(name='Sabah', start_time='09:00', end_time='18:00', tenant=self.tenant)
         self.task = Task.objects.create(
             title='Kasa Temizliği',
             requires_photo=False,
             coefficient=2,
             created_by=self.manager,
+            tenant=self.tenant,
         )
 
     # ── Convenience ───────────────────────────────────────────────────────────
@@ -121,10 +127,10 @@ class AssignmentCreationTests(TaskFlowTestCase):
     def test_gender_restricted_task_blocks_wrong_gender(self):
         male_task = Task.objects.create(
             title='Ağır Kaldırma', coefficient=1,
-            allowed_genders='male', created_by=self.manager
+            allowed_genders='male', created_by=self.manager, tenant=self.tenant
         )
         female_emp = User.objects.create_user(
-            email='female@test.com', password='pass', name='Kadın', role='employee', gender='female'
+            email='female@test.com', password='pass', name='Kadın', role='employee', gender='female', tenant=self.tenant
         )
         auth(self.client, self.manager)
         resp = self.client.post('/api/assignments/bulk/', {
@@ -139,10 +145,10 @@ class AssignmentCreationTests(TaskFlowTestCase):
     def test_employee_sees_own_assignments_only(self):
         """Employee kendi atamaları dışındakileri görmemeli."""
         other_emp = User.objects.create_user(
-            email='other@test.com', password='pass', name='Diğer', role='employee'
+            email='other@test.com', password='pass', name='Diğer', role='employee', tenant=self.tenant
         )
-        task2 = Task.objects.create(title='Diğer Görev', coefficient=1, created_by=self.manager)
-        Assignment.objects.create(user=other_emp, task=task2, date=self.today)
+        task2 = Task.objects.create(title='Diğer Görev', coefficient=1, created_by=self.manager, tenant=self.tenant)
+        Assignment.objects.create(tenant=self.tenant, user=other_emp, task=task2, date=self.today)
 
         assignment = self._assign()
 
@@ -168,7 +174,7 @@ class SubmissionTests(TaskFlowTestCase):
     def test_photo_required_task_rejects_without_photo(self):
         photo_task = Task.objects.create(
             title='Fotoğraflı Görev', requires_photo=True,
-            coefficient=1, created_by=self.manager
+            coefficient=1, created_by=self.manager, tenant=self.tenant
         )
         auth(self.client, self.manager)
         self.client.post('/api/assignments/bulk/', {
@@ -186,7 +192,7 @@ class SubmissionTests(TaskFlowTestCase):
     def test_employee_cannot_submit_for_others_assignment(self):
         assignment = self._assign()
         other_emp = User.objects.create_user(
-            email='other@test.com', password='pass', name='Diğer', role='employee'
+            email='other@test.com', password='pass', name='Diğer', role='employee', tenant=self.tenant
         )
         auth(self.client, other_emp)
         resp = self.client.post('/api/assignments/submissions/', {
@@ -316,7 +322,7 @@ class AuditViewTests(TaskFlowTestCase):
     def test_audit_log_supervisor_filter(self):
         """Farklı şef için filtreleme çalışmalı."""
         sup2 = User.objects.create_user(
-            email='sup2@test.com', password='pass', name='Şef2', role='supervisor'
+            email='sup2@test.com', password='pass', name='Şef2', role='supervisor', tenant=self.tenant
         )
         assignment = self._assign()
         sub = self._submit(assignment)
@@ -354,14 +360,16 @@ class AuditViewTests(TaskFlowTestCase):
         resp2 = self.client.get('/api/assignments/audit/?date_from=2000-01-01&date_to=2000-01-01')
         self.assertEqual(len(resp2.data), 0)
 
-    def test_audit_log_forbidden_for_non_manager(self):
+    def test_audit_log_forbidden_for_employee(self):
         auth(self.client, self.employee)
         resp = self.client.get('/api/assignments/audit/')
         self.assertIn(resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED])
 
+    def test_audit_log_allowed_for_supervisor_scoped_to_own_unit(self):
+        """Şefler artık denetim kaydına erişebilir, ama sadece kendi biriminin personeline ait."""
         auth(self.client, self.supervisor)
         resp = self.client.get('/api/assignments/audit/')
-        self.assertIn(resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED])
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
 
 # ── 6. Performans Görünümü Testi ──────────────────────────────────────────────
@@ -385,13 +393,194 @@ class PerformanceViewTests(TaskFlowTestCase):
 
     def test_employee_sees_only_own_performance(self):
         other = User.objects.create_user(
-            email='other@test.com', password='pass', name='Diğer', role='employee'
+            email='other@test.com', password='pass', name='Diğer', role='employee', tenant=self.tenant
         )
-        task2 = Task.objects.create(title='Görev2', coefficient=1, created_by=self.manager)
-        Assignment.objects.create(user=other, task=task2, date=self.today)
+        task2 = Task.objects.create(title='Görev2', coefficient=1, created_by=self.manager, tenant=self.tenant)
+        Assignment.objects.create(tenant=self.tenant, user=other, task=task2, date=self.today)
 
         auth(self.client, self.employee)
         resp = self.client.get('/api/assignments/performance/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         for row in resp.data:
             self.assertEqual(row['user_id'], self.employee.id)
+
+
+# ── 5. Tenant İzolasyon Testleri ────────────────────────────────────────────
+
+class CrossTenantIsolationTests(TaskFlowTestCase):
+    """Bir işletmenin verisi başka bir işletmeye asla sızmamalı."""
+
+    def setUp(self):
+        super().setUp()
+        self.other_tenant = Tenant.objects.create(name='Başka İşletme', license_limit=10)
+        self.other_manager = User.objects.create_user(
+            email='other-manager@test.com', password='pass', name='Diğer Müdür',
+            role='manager', tenant=self.other_tenant,
+        )
+        self.other_employee = User.objects.create_user(
+            email='other-employee@test.com', password='pass', name='Diğer Personel',
+            role='employee', tenant=self.other_tenant,
+        )
+        self.other_task = Task.objects.create(
+            title='Başka Görev', coefficient=1, created_by=self.other_manager, tenant=self.other_tenant
+        )
+        self.other_assignment = Assignment.objects.create(
+            tenant=self.other_tenant, user=self.other_employee, task=self.other_task, date=self.today
+        )
+
+    def test_store_endpoint_only_shows_own_tenant(self):
+        auth(self.client, self.employee)
+        resp = self.client.get('/api/assignments/store/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = [a['id'] for a in resp.data]
+        self.assertNotIn(self.other_assignment.id, ids)
+
+    def test_manager_bulk_assign_cannot_use_foreign_task_or_user(self):
+        auth(self.client, self.manager)
+        resp = self.client.post('/api/assignments/bulk/', {
+            'date': self.today,
+            'assignments': [{'user_id': self.other_employee.id, 'task_id': self.other_task.id}],
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['created'], 0)
+        self.assertTrue(len(resp.data['errors']) > 0)
+
+    def test_manager_bulk_assign_does_not_delete_other_tenants_pending(self):
+        auth(self.client, self.other_manager)
+        self.client.post('/api/assignments/bulk/', {
+            'date': self.today,
+            'assignments': [{'user_id': self.other_employee.id, 'task_id': self.other_task.id}],
+        }, format='json')
+
+        auth(self.client, self.manager)
+        self.client.post('/api/assignments/bulk/', {
+            'date': self.today,
+            'assignments': [{'user_id': self.employee.id, 'task_id': self.task.id}],
+        }, format='json')
+
+        self.assertTrue(
+            Assignment.objects.filter(tenant=self.other_tenant, user=self.other_employee, date=self.today).exists()
+        )
+
+    def test_supervisor_cannot_approve_foreign_tenant_submission(self):
+        other_submission = TaskSubmission.objects.create(
+            tenant=self.other_tenant, assignment=self.other_assignment,
+        )
+        auth(self.client, self.supervisor)
+        resp = self.client.put(f'/api/assignments/submissions/{other_submission.id}/approve/', {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_manager_cannot_see_foreign_tenant_zones_tasks(self):
+        auth(self.client, self.manager)
+        resp = self.client.get('/api/tasks/')
+        titles = [t['title'] for t in resp.data]
+        self.assertNotIn(self.other_task.title, titles)
+
+
+# ── 6. Birim İzolasyon Testleri ─────────────────────────────────────
+
+class UnitIsolationTests(APITestCase):
+    """Aynı tenant içinde, farklı birimlerdeki şefler birbirinin personelinin verisini görememeli."""
+
+    def setUp(self):
+        self.today = date.today().isoformat()
+        self.tenant = Tenant.objects.create(name='Restoran', license_limit=100)
+        self.unit_a = Unit.objects.create(name='Mutfak Ekibi', tenant=self.tenant)
+        self.unit_b = Unit.objects.create(name='Bar Ekibi', tenant=self.tenant)
+
+        self.manager = User.objects.create_user(
+            email='manager@test.com', password='pass', name='Müdür', role='manager', tenant=self.tenant
+        )
+        self.sup_a = User.objects.create_user(
+            email='sup-a@test.com', password='pass', name='Mutfak Şefi', role='supervisor',
+            tenant=self.tenant, unit=self.unit_a,
+        )
+        self.sup_b = User.objects.create_user(
+            email='sup-b@test.com', password='pass', name='Bar Şefi', role='supervisor',
+            tenant=self.tenant, unit=self.unit_b,
+        )
+        self.emp_a = User.objects.create_user(
+            email='emp-a@test.com', password='pass', name='Mutfak Personeli', role='employee',
+            tenant=self.tenant, unit=self.unit_a,
+        )
+        self.emp_b = User.objects.create_user(
+            email='emp-b@test.com', password='pass', name='Bar Personeli', role='employee',
+            tenant=self.tenant, unit=self.unit_b,
+        )
+
+        self.task_a = Task.objects.create(
+            title='Mutfak Görevi', coefficient=1, created_by=self.manager, tenant=self.tenant, unit=self.unit_a
+        )
+        self.task_b = Task.objects.create(
+            title='Bar Görevi', coefficient=1, created_by=self.manager, tenant=self.tenant, unit=self.unit_b
+        )
+        self.assignment_a = Assignment.objects.create(
+            tenant=self.tenant, user=self.emp_a, task=self.task_a, date=self.today
+        )
+        self.assignment_b = Assignment.objects.create(
+            tenant=self.tenant, user=self.emp_b, task=self.task_b, date=self.today
+        )
+
+    def test_supervisor_bulk_assign_cannot_target_other_unit(self):
+        auth(self.client, self.sup_a)
+        resp = self.client.post('/api/assignments/bulk/', {
+            'date': self.today,
+            'assignments': [{'user_id': self.emp_b.id, 'task_id': self.task_b.id}],
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['created'], 0)
+        self.assertTrue(len(resp.data['errors']) > 0)
+
+    def test_supervisor_bulk_assign_does_not_wipe_other_unit_pending(self):
+        Assignment.objects.filter(id=self.assignment_a.id).update(status='pending')
+        Assignment.objects.filter(id=self.assignment_b.id).update(status='pending')
+
+        auth(self.client, self.sup_a)
+        self.client.post('/api/assignments/bulk/', {
+            'date': self.today,
+            'assignments': [{'user_id': self.emp_a.id, 'task_id': self.task_a.id}],
+        }, format='json')
+
+        self.assertTrue(Assignment.objects.filter(user=self.emp_b, task=self.task_b, date=self.today).exists())
+
+    def test_store_board_scoped_to_own_unit(self):
+        auth(self.client, self.sup_a)
+        resp = self.client.get('/api/assignments/store/')
+        titles = {a['task']['title'] for a in resp.data}
+        self.assertIn('Mutfak Görevi', titles)
+        self.assertNotIn('Bar Görevi', titles)
+
+    def test_manager_store_board_sees_everything(self):
+        auth(self.client, self.manager)
+        resp = self.client.get('/api/assignments/store/')
+        titles = {a['task']['title'] for a in resp.data}
+        self.assertEqual(titles, {'Mutfak Görevi', 'Bar Görevi'})
+
+    def test_supervisor_assignment_list_scoped_to_own_unit(self):
+        auth(self.client, self.sup_a)
+        resp = self.client.get(f'/api/assignments/?date={self.today}')
+        user_ids = {a['user']['id'] for a in resp.data}
+        self.assertEqual(user_ids, {self.emp_a.id})
+
+    def test_supervisor_audit_scoped_to_own_unit(self):
+        sub_a = TaskSubmission.objects.create(tenant=self.tenant, assignment=self.assignment_a, approval_status='approved')
+        sub_b = TaskSubmission.objects.create(tenant=self.tenant, assignment=self.assignment_b, approval_status='approved')
+
+        auth(self.client, self.sup_a)
+        resp = self.client.get('/api/assignments/audit/')
+        task_titles = {row['task_title'] for row in resp.data}
+        self.assertIn('Mutfak Görevi', task_titles)
+        self.assertNotIn('Bar Görevi', task_titles)
+
+    def test_supervisor_performance_scoped_to_own_unit(self):
+        auth(self.client, self.sup_a)
+        resp = self.client.get('/api/assignments/performance/')
+        user_ids = {row['user_id'] for row in resp.data}
+        self.assertIn(self.emp_a.id, user_ids)
+        self.assertNotIn(self.emp_b.id, user_ids)
+
+    def test_supervisor_cannot_approve_other_unit_submission(self):
+        sub_b = TaskSubmission.objects.create(tenant=self.tenant, assignment=self.assignment_b)
+        auth(self.client, self.sup_a)
+        resp = self.client.put(f'/api/assignments/submissions/{sub_b.id}/approve/', {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)

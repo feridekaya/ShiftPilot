@@ -1,9 +1,12 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { User, Role, Gender, Assignment, ApprovalStatus } from '@/types';
+import { User, Role, Gender, Assignment, ApprovalStatus, Tenant, Unit, JobRole } from '@/types';
 import * as userService from '@/services/users';
 import * as assignmentService from '@/services/assignments';
+import * as tenantService from '@/services/tenants';
+import * as unitService from '@/services/units';
+import * as roleService from '@/services/roles';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
@@ -11,12 +14,21 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import { AxiosError } from 'axios';
 
-const emptyForm = { name: '', email: '', password: '', role: 'employee' as Role, gender: '' as Gender | '', is_active: true };
+const emptyForm = {
+  name: '', email: '', password: '',
+  gender: '' as Gender | '', unit_id: '' as number | '', job_role_id: '' as number | '', is_active: true,
+};
 
 type SortField = 'name' | 'role' | 'email';
 type SortDir = 'asc' | 'desc';
 
 const roleOrder: Record<Role, number> = { manager: 0, supervisor: 1, employee: 2 };
+
+const yetkiLabel: Record<Role, string> = {
+  manager: 'Yönetici',
+  supervisor: 'Şef',
+  employee: 'Personel',
+};
 
 const approvalLabel: Record<ApprovalStatus, string> = {
   pending: 'Bekliyor',
@@ -26,7 +38,11 @@ const approvalLabel: Record<ApprovalStatus, string> = {
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [roles, setRoles] = useState<JobRole[]>([]);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [upsellOpen, setUpsellOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
@@ -43,14 +59,28 @@ export default function UsersPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => { userService.getUsers().then(setUsers); }, []);
+  useEffect(() => { unitService.getUnits().then(setUnits); }, []);
+  useEffect(() => { roleService.getRoles().then(setRoles); }, []);
+  useEffect(() => { refreshTenant(); }, []);
+
+  function refreshTenant() {
+    tenantService.getMyTenant().then(setTenant);
+  }
 
   function openCreate() {
+    if (tenant && tenant.seats_remaining <= 0) {
+      setUpsellOpen(true);
+      return;
+    }
     setEditing(null); setForm(emptyForm); setError(''); setIsOpen(true);
   }
 
   function openEdit(u: User) {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, gender: u.gender ?? '', is_active: u.is_active });
+    setForm({
+      name: u.name, email: u.email, password: '',
+      gender: u.gender ?? '', unit_id: u.unit?.id ?? '', job_role_id: u.job_role?.id ?? '', is_active: u.is_active,
+    });
     setError(''); setIsOpen(true);
   }
 
@@ -69,7 +99,12 @@ export default function UsersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(''); setSaving(true);
     try {
-      const payload = { ...form, gender: form.gender || undefined };
+      const payload = {
+        ...form,
+        gender: form.gender || undefined,
+        unit_id: form.unit_id === '' ? null : form.unit_id,
+        job_role_id: form.job_role_id === '' ? undefined : form.job_role_id,
+      };
       if (!payload.password) delete (payload as Partial<typeof payload>).password;
       if (editing) {
         const updated = await userService.updateUser(editing.id, payload);
@@ -79,16 +114,21 @@ export default function UsersPage() {
         setUsers([...users, created]);
       }
       setIsOpen(false);
+      refreshTenant();
     } catch (err) {
       const e = err as AxiosError<Record<string, string[]>>;
       setError(Object.values(e.response?.data ?? {}).flat().join(' ') || 'Bir hata oluştu.');
     } finally { setSaving(false); }
   }
 
-  async function handleDelete(u: User) {
-    if (!confirm(`${u.name} silinsin mi?`)) return;
-    await userService.deleteUser(u.id);
-    setUsers(users.filter(x => x.id !== u.id));
+  async function handlePasifAl(u: User) {
+    if (!confirm(`${u.name} pasife alınsın mı? Artık sisteme giriş yapamayacak.`)) return;
+    const updated = await userService.updateUser(u.id, {
+      name: u.name, email: u.email, gender: u.gender ?? undefined,
+      unit_id: u.unit?.id ?? null, is_active: false,
+    });
+    setUsers(users.map(x => x.id === updated.id ? updated : x));
+    refreshTenant();
   }
 
   function handleSort(field: SortField) {
@@ -115,12 +155,36 @@ export default function UsersPage() {
     return <span className="text-indigo-500 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   }
 
+  const usagePct = tenant && tenant.license_limit > 0
+    ? Math.min(100, Math.round((tenant.active_user_count / tenant.license_limit) * 100))
+    : 0;
+  const isFull = !!tenant && tenant.seats_remaining <= 0;
+  const barColor = usagePct >= 100 ? 'bg-red-500' : usagePct >= 80 ? 'bg-amber-500' : 'bg-sp-accent';
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <h1 className="text-xl font-bold">Kullanıcılar</h1>
-        <Button onClick={openCreate}>+ Yeni Kullanıcı</Button>
+        <Button onClick={openCreate} className="w-full sm:w-auto justify-center">+ Yeni Kullanıcı</Button>
       </div>
+
+      {/* Lisans Kullanımı */}
+      {tenant && (
+        <div className="bg-sp-card border border-sp-border rounded-xl p-4 mb-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+            <p className="text-sm font-medium text-sp-text">
+              Lisans Kullanımı: <span className="font-semibold">{tenant.active_user_count} / {tenant.license_limit}</span> Aktif Kullanıcı
+              <span className="text-sp-muted"> (%{usagePct} Dolu)</span>
+            </p>
+            <p className="text-xs text-sp-muted">
+              {isFull ? 'Kalan Kota: 0 Personel' : `Kalan Kota: ${tenant.seats_remaining} Personel`}
+            </p>
+          </div>
+          <div className="h-2 rounded-full bg-slate-200 dark:bg-[#1E293B] overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${usagePct}%` }} />
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap gap-3 mb-4 items-center">
@@ -164,6 +228,7 @@ export default function UsersPage() {
                 Rol <SortIcon field="role" />
               </th>
               <th className="px-4 py-3 text-left">Cinsiyet</th>
+              <th className="px-4 py-3 text-left">Birim</th>
               <th className="px-4 py-3 text-left">Aktif</th>
               <th className="px-4 py-3 text-left">İşlemler</th>
             </tr>
@@ -173,20 +238,28 @@ export default function UsersPage() {
               <tr key={u.id} className={`transition-colors ${['bg-white dark:bg-[#111E38]', 'bg-[#f8f9fa] dark:bg-[#0A1128]', 'bg-[#f0f2f5] dark:bg-[#111E38]'][i % 3]} hover:bg-[#e9ecef] dark:hover:bg-[#192d4a] dark:text-slate-100 ${!u.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-3 font-medium">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{u.email}</td>
-                <td className="px-4 py-3"><Badge status={u.role} /></td>
+                <td className="px-4 py-3">
+                  <Badge status={u.role} />
+                  {u.job_role && (
+                    <span className="ml-1.5 text-xs text-gray-500 dark:text-slate-400">{u.job_role.name}</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-600">
                   {u.gender === 'male' ? 'Erkek' : u.gender === 'female' ? 'Kadın' : '-'}
                 </td>
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{u.unit?.name ?? '-'}</td>
                 <td className="px-4 py-3">{u.is_active ? '✓' : '✗'}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => openHistory(u)}>Geçmiş</Button>
                   <Button size="sm" variant="secondary" onClick={() => openEdit(u)}>Düzenle</Button>
-                  <Button size="sm" variant="danger" onClick={() => handleDelete(u)}>Sil</Button>
+                  {u.is_active && (
+                    <Button size="sm" variant="danger" onClick={() => handlePasifAl(u)}>Pasife Al</Button>
+                  )}
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Kullanıcı bulunamadı.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Kullanıcı bulunamadı.</td></tr>
             )}
           </tbody>
         </table>
@@ -201,10 +274,24 @@ export default function UsersPage() {
           <Input label={editing ? 'Şifre (değiştirmek için)' : 'Şifre'} type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required={!editing} />
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">Rol</label>
-            <select className="rounded-md border border-gray-300 px-3 py-2 text-sm" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}>
-              <option value="employee">Personel</option>
-              <option value="supervisor">Şef</option>
-              <option value="manager">Yönetici</option>
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={form.job_role_id}
+              onChange={e => {
+                const job_role_id = e.target.value ? Number(e.target.value) : '';
+                const selectedRole = roles.find(r => r.id === job_role_id);
+                setForm({
+                  ...form,
+                  job_role_id,
+                  unit_id: selectedRole?.unit ? selectedRole.unit.id : form.unit_id,
+                });
+              }}
+              required={!editing}
+            >
+              <option value="">{editing ? 'Değiştirme' : 'Seçiniz'}</option>
+              {roles.map(r => (
+                <option key={r.id} value={r.id}>{r.name} ({yetkiLabel[r.base_role]})</option>
+              ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
@@ -214,6 +301,22 @@ export default function UsersPage() {
               <option value="male">Erkek</option>
               <option value="female">Kadın</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Birim</label>
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={form.unit_id}
+              onChange={e => setForm({ ...form, unit_id: e.target.value ? Number(e.target.value) : '' })}
+            >
+              <option value="">Birim yok</option>
+              {units.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-amber-600 mt-1">
+              Şeflerin birimi olmazsa hiçbir veri göremezler.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
@@ -282,6 +385,25 @@ export default function UsersPage() {
             ))}
           </div>
         )}
+      </Modal>
+
+      {/* ── Lisans Limiti Modal ── */}
+      <Modal isOpen={upsellOpen} onClose={() => setUpsellOpen(false)} title="Lisans Limitine Ulaşıldı">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-sp-text">
+            Paketinizdeki <strong>{tenant?.license_limit}</strong> kişilik kullanıcı kotasını doldurdunuz.
+            Ekibinize yeni personel eklemek ve lisans limitinizi yükseltmek için temsilcinizle iletişime geçin.
+          </p>
+          <p className="text-xs text-sp-muted">
+            İpucu: Artık çalışmayan bir personeli &quot;Pasife Al&quot; ile arşivleyerek yerine yeni birini ekleyebilirsiniz.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setUpsellOpen(false)}>Kapat</Button>
+            <Button onClick={() => { window.location.href = 'mailto:info@appshiftpilot.com?subject=Lisans%20Paketi%20Y%C3%BCkseltme'; setUpsellOpen(false); }}>
+              Paket Yükselt / İletişime Geç
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

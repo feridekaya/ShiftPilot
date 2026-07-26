@@ -62,8 +62,13 @@ export default function Navbar({ onMenuToggle }: { onMenuToggle?: () => void }) 
             <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">
               {user.name}{' '}
               <span className="ml-1 text-xs text-indigo-500 font-medium">
-                [{roleLabel[user.role] ?? user.role}]
+                [{user.job_role?.name ?? roleLabel[user.role] ?? user.role}]
               </span>
+              {user.role !== 'manager' && (
+                <span className="ml-1 text-xs text-slate-400">
+                  {user.unit ? `· ${user.unit.name}` : '· Birim atanmadı'}
+                </span>
+              )}
             </span>
             <Button variant="secondary" size="sm" onClick={logout}>
               Çıkış

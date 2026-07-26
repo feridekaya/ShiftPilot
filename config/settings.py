@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'storages',
     # Local apps
+    'tenants',
     'users',
     'tasks',
     'assignments',

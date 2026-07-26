@@ -9,6 +9,11 @@ class Announcement(models.Model):
         ('critical', 'Kritik'),
     ]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='announcements')
+    unit = models.ForeignKey(
+        'tasks.Unit', on_delete=models.SET_NULL, null=True, blank=True, related_name='announcements',
+        help_text='Boş = tüm işletmeye açık. Dolu = sadece o birime özel.'
+    )
     title = models.CharField(max_length=200)
     content = models.TextField()
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')

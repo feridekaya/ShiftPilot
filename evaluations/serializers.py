@@ -1,5 +1,8 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from .models import EmployeeEvaluation
+
+User = get_user_model()
 
 
 class EmployeeEvaluationSerializer(serializers.ModelSerializer):
@@ -18,3 +21,13 @@ class EmployeeEvaluationSerializer(serializers.ModelSerializer):
             'note', 'created_at',
         ]
         read_only_fields = ['id', 'evaluator', 'created_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = getattr(self.context.get('request'), 'user', None)
+        tenant = getattr(user, 'tenant', None)
+        if tenant:
+            qs = User.objects.filter(tenant=tenant)
+            if getattr(user, 'role', None) == 'supervisor':
+                qs = qs.filter(unit_id=user.unit_id) if user.unit_id else qs.none()
+            self.fields['evaluatee'].queryset = qs

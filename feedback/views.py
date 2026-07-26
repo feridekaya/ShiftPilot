@@ -20,7 +20,10 @@ class FeedbackListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         if user.role in ('manager', 'supervisor'):
-            qs = Feedback.objects.select_related('user', 'responded_by').all()
+            qs = Feedback.objects.filter(user__tenant=user.tenant)
+            if user.role == 'supervisor':
+                qs = qs.filter(user__unit_id=user.unit_id) if user.unit_id else qs.none()
+            qs = qs.select_related('user', 'responded_by')
             category = self.request.query_params.get('category')
             response_filter = self.request.query_params.get('response')
             if category:
@@ -87,7 +90,9 @@ class FeedbackStatsView(APIView):
                 },
             }
 
-        all_fb = Feedback.objects.all()
+        all_fb = Feedback.objects.filter(user__tenant=request.user.tenant)
+        if request.user.role == 'supervisor':
+            all_fb = all_fb.filter(user__unit_id=request.user.unit_id) if request.user.unit_id else all_fb.none()
         return Response({
             'today':   stats_for(all_fb.filter(created_at__gte=today_start, created_at__lt=today_end)),
             'week':    stats_for(all_fb.filter(created_at__gte=week_start,  created_at__lt=today_end)),
@@ -104,7 +109,10 @@ class FeedbackRespondView(APIView):
             return Response({'detail': 'Yetkisiz.'}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            feedback = Feedback.objects.get(pk=pk)
+            fb_qs = Feedback.objects.filter(user__tenant=request.user.tenant)
+            if request.user.role == 'supervisor':
+                fb_qs = fb_qs.filter(user__unit_id=request.user.unit_id) if request.user.unit_id else fb_qs.none()
+            feedback = fb_qs.get(pk=pk)
         except Feedback.DoesNotExist:
             return Response({'detail': 'Bulunamadı.'}, status=status.HTTP_404_NOT_FOUND)
 

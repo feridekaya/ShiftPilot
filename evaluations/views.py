@@ -32,25 +32,29 @@ class DailyEmployeeListView(APIView):
         else:
             target_date = date_type.today()
 
+        is_supervisor = request.user.role == 'supervisor'
+        if is_supervisor and not request.user.unit_id:
+            return Response([])
+
         # Primary source: WorkSchedule (çizelge) — employees not on off day
-        schedule_ids = (
-            WorkSchedule.objects
-            .filter(date=target_date, is_off=False, user__role='employee', user__is_active=True)
-            .values_list('user_id', flat=True)
-            .distinct()
+        schedule_qs = WorkSchedule.objects.filter(
+            date=target_date, is_off=False, user__tenant=request.user.tenant, user__role='employee', user__is_active=True
         )
+        if is_supervisor:
+            schedule_qs = schedule_qs.filter(user__unit_id=request.user.unit_id)
+        schedule_ids = schedule_qs.values_list('user_id', flat=True).distinct()
 
         if schedule_ids:
             employee_ids = list(schedule_ids)
         else:
             # Fallback: employees with assignments that day
             from assignments.models import Assignment
-            employee_ids = list(
-                Assignment.objects
-                .filter(date=target_date, user__role='employee', user__is_active=True)
-                .values_list('user_id', flat=True)
-                .distinct()
+            assignment_qs = Assignment.objects.filter(
+                date=target_date, tenant=request.user.tenant, user__role='employee', user__is_active=True
             )
+            if is_supervisor:
+                assignment_qs = assignment_qs.filter(user__unit_id=request.user.unit_id)
+            employee_ids = list(assignment_qs.values_list('user_id', flat=True).distinct())
 
         evaluated_ids = set(
             EmployeeEvaluation.objects
@@ -58,7 +62,7 @@ class DailyEmployeeListView(APIView):
             .values_list('evaluatee_id', flat=True)
         )
 
-        employees = User.objects.filter(id__in=employee_ids).order_by('name')
+        employees = User.objects.filter(id__in=employee_ids, tenant=request.user.tenant).order_by('name')
 
         result = []
         for emp in employees:
@@ -108,7 +112,16 @@ class EmployeeEvaluationCreateView(generics.CreateAPIView):
         except ValueError:
             return Response({'detail': 'Geçersiz tarih.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if EmployeeEvaluation.objects.filter(evaluatee_id=evaluatee_id, date=target_date).exists():
+        if request.user.role == 'supervisor':
+            evaluatee_qs = User.objects.filter(tenant=request.user.tenant)
+            evaluatee_qs = evaluatee_qs.filter(unit_id=request.user.unit_id) if request.user.unit_id else evaluatee_qs.none()
+            if not evaluatee_qs.filter(id=evaluatee_id).exists():
+                return Response(
+                    {'detail': 'Sadece kendi biriminizdeki personeli değerlendirebilirsiniz.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        if EmployeeEvaluation.objects.filter(evaluatee_id=evaluatee_id, evaluatee__tenant=request.user.tenant, date=target_date).exists():
             return Response(
                 {'detail': 'Bu personel bugün zaten değerlendirildi.'},
                 status=status.HTTP_409_CONFLICT,
@@ -124,7 +137,15 @@ class EmployeeEvaluationDetailView(generics.RetrieveAPIView):
     """GET /api/evaluations/<id>/"""
     serializer_class = EmployeeEvaluationSerializer
     permission_classes = [IsAuthenticated]
-    queryset = EmployeeEvaluation.objects.select_related('evaluatee', 'evaluator')
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = EmployeeEvaluation.objects.filter(evaluatee__tenant=user.tenant)
+        if user.role == 'supervisor':
+            qs = qs.filter(evaluatee__unit_id=user.unit_id) if user.unit_id else qs.none()
+        elif user.role == 'employee':
+            qs = qs.filter(evaluatee=user)
+        return qs.select_related('evaluatee', 'evaluator')
 
 
 class EvaluationSummaryView(APIView):
@@ -140,7 +161,10 @@ class EvaluationSummaryView(APIView):
 
         from django.db.models import Avg, Count
 
-        qs = EmployeeEvaluation.objects.select_related('evaluatee')
+        qs = EmployeeEvaluation.objects.filter(evaluatee__tenant=request.user.tenant)
+        if request.user.role == 'supervisor':
+            qs = qs.filter(evaluatee__unit_id=request.user.unit_id) if request.user.unit_id else qs.none()
+        qs = qs.select_related('evaluatee')
         date_from_str = request.query_params.get('date_from')
         date_to_str   = request.query_params.get('date_to')
         if date_from_str:

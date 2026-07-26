@@ -1,5 +1,7 @@
+from django.db.models import Q
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,13 +9,42 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from uuid import uuid4
 
-from users.permissions import IsManager
 from .models import Training
 from .serializers import TrainingSerializer
 
 
+def scope_by_unit(qs, user):
+    """Manager: no change. Supervisor/employee: own unit + tenant-wide (unit=null) items."""
+    if user.role in ('supervisor', 'employee'):
+        return qs.filter(Q(unit_id=user.unit_id) | Q(unit__isnull=True)) if user.unit_id else qs.filter(unit__isnull=True)
+    return qs
+
+
+class IsManagerOrSupervisorWriter(BasePermission):
+    """Manager: full access. Supervisor: can write, but only within their own unit
+    (enforced in perform_create / has_object_permission). Employee: read-only."""
+
+    def has_permission(self, request, view):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return bool(request.user and request.user.is_authenticated)
+        return bool(
+            request.user and request.user.is_authenticated
+            and request.user.role in ('manager', 'supervisor')
+        )
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        user = request.user
+        if not (user and user.is_authenticated and user.role in ('manager', 'supervisor')):
+            return False
+        if user.role == 'supervisor':
+            return user.unit_id is not None and obj.unit_id == user.unit_id
+        return True
+
+
 class PdfUploadView(APIView):
-    permission_classes = [IsAuthenticated, IsManager]
+    permission_classes = [IsAuthenticated, IsManagerOrSupervisorWriter]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -43,37 +74,42 @@ class PdfUploadView(APIView):
 
 class TrainingListCreateView(generics.ListCreateAPIView):
     serializer_class = TrainingSerializer
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAuthenticated(), IsManager()]
-        return [IsAuthenticated()]
+    permission_classes = [IsManagerOrSupervisorWriter]
 
     def get_queryset(self):
         user = self.request.user
-        qs = Training.objects.filter(is_active=True)
+        qs = Training.objects.filter(tenant=user.tenant, is_active=True)
         if user.role == 'manager':
             return qs
-        return qs.filter(visible_to__contains=user.role)
+        return scope_by_unit(qs, user).filter(visible_to__contains=user.role)
 
     def perform_create(self, serializer):
-        serializer.save(uploaded_by=self.request.user)
+        user = self.request.user
+        if user.role == 'supervisor':
+            if not user.unit_id:
+                raise ValidationError({'detail': 'Bir birime atanmamış şefler eğitim oluşturamaz.'})
+            serializer.save(tenant=user.tenant, uploaded_by=user, unit_id=user.unit_id)
+        else:
+            serializer.save(tenant=user.tenant, uploaded_by=user)
 
 
 class TrainingDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TrainingSerializer
-
-    def get_permissions(self):
-        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
-            return [IsAuthenticated(), IsManager()]
-        return [IsAuthenticated()]
+    permission_classes = [IsManagerOrSupervisorWriter]
 
     def get_queryset(self):
         user = self.request.user
-        qs = Training.objects.all()
+        qs = Training.objects.filter(tenant=user.tenant)
         if user.role == 'manager':
             return qs
-        return qs.filter(is_active=True, visible_to__contains=user.role)
+        return scope_by_unit(qs, user).filter(is_active=True, visible_to__contains=user.role)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if user.role == 'supervisor':
+            serializer.save(unit_id=user.unit_id)
+        else:
+            serializer.save()
 
     def perform_destroy(self, instance):
         instance.is_active = False

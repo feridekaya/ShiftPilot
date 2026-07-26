@@ -3,6 +3,11 @@ from django.conf import settings
 
 
 class Training(models.Model):
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='trainings')
+    unit = models.ForeignKey(
+        'tasks.Unit', on_delete=models.SET_NULL, null=True, blank=True, related_name='trainings',
+        help_text='Boş = tüm işletmeye açık. Dolu = sadece o birime özel.'
+    )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     pdf_url = models.URLField()

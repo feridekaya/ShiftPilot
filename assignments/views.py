@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from django.conf import settings
 from django.db.models import Count, Sum, Q, F
 
-from users.permissions import IsManager, IsManagerOrSupervisor, IsSupervisor
+from users.permissions import IsManagerOrSupervisor, IsSupervisor
 from .models import Assignment, TaskSubmission, RejectionLog, ActivityLog
 from .serializers import (
     AssignmentSerializer, TaskSubmissionSerializer, SubmissionApprovalSerializer,
@@ -93,7 +93,10 @@ class AssignmentSuggestView(GenericAPIView):
         trday = target_date.weekday()  # 0=Mon … 6=Sun
 
         # ── Employees ──────────────────────────────────────────────────────
-        employees = list(UserModel.objects.filter(role='employee', is_active=True))
+        emp_qs = UserModel.objects.filter(tenant=request.user.tenant, role='employee', is_active=True)
+        if request.user.role == 'supervisor':
+            emp_qs = emp_qs.filter(unit_id=request.user.unit_id) if request.user.unit_id else emp_qs.none()
+        employees = list(emp_qs)
         if not employees:
             return Response({'date': date_str, 'suggestions': [], 'employee_loads': [], 'avg_load': 0})
 
@@ -120,6 +123,7 @@ class AssignmentSuggestView(GenericAPIView):
         cutoff = target_date - timedelta(days=30)
         completed_counts = dict(
             Assignment.objects.filter(
+                tenant=request.user.tenant,
                 user__role='employee',
                 status__in=['completed', 'approved'],
             ).values('user_id').annotate(n=Count('id')).values_list('user_id', 'n')
@@ -130,7 +134,10 @@ class AssignmentSuggestView(GenericAPIView):
         }
 
         # ── Tasks ──────────────────────────────────────────────────────────
-        tasks = list(TaskModel.objects.select_related('zone').prefetch_related('permanent_assignees'))
+        task_qs = TaskModel.objects.filter(tenant=request.user.tenant)
+        if request.user.role == 'supervisor':
+            task_qs = task_qs.filter(Q(unit_id=request.user.unit_id) | Q(unit__isnull=True)) if request.user.unit_id else task_qs.filter(unit__isnull=True)
+        tasks = list(task_qs.select_related('zone').prefetch_related('permanent_assignees'))
 
         def task_applies(t):
             try:
@@ -155,7 +162,7 @@ class AssignmentSuggestView(GenericAPIView):
 
         # ── Current load already assigned on this date ──────────────────────
         employee_loads = defaultdict(float)
-        for a in Assignment.objects.filter(date=target_date).select_related('task'):
+        for a in Assignment.objects.filter(tenant=request.user.tenant, date=target_date).select_related('task'):
             employee_loads[a.user_id] += float(a.coefficient_share or a.task.coefficient)
         for emp in active_employees:
             employee_loads.setdefault(emp.id, 0.0)
@@ -310,10 +317,12 @@ class PerformanceView(GenericAPIView):
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
 
-        qs = Assignment.objects.all()
-        # Employees can only see their own stats
+        qs = Assignment.objects.filter(tenant=request.user.tenant)
+        # Employees can only see their own stats; supervisors only their unit's employees
         if request.user.role == 'employee':
             qs = qs.filter(user=request.user)
+        elif request.user.role == 'supervisor':
+            qs = qs.filter(user__unit_id=request.user.unit_id) if request.user.unit_id else qs.none()
         if date_from:
             qs = qs.filter(date__gte=date_from)
         if date_to:
@@ -447,15 +456,19 @@ class BusinessDateView(GenericAPIView):
 
 
 class AuditView(GenericAPIView):
-    """Manager-only audit log of all approvals and rejections."""
-    permission_classes = [IsAuthenticated, IsManager]
+    """Manager: tüm tenant. Şef: sadece kendi biriminin personeli."""
+    permission_classes = [IsAuthenticated, IsManagerOrSupervisor]
 
     def get(self, request):
         qs = TaskSubmission.objects.filter(
-            approval_status__in=['approved', 'rejected']
+            tenant=request.user.tenant,
+            approval_status__in=['approved', 'rejected'],
         ).select_related(
             'assignment__user', 'assignment__task', 'assignment__zone', 'approved_by'
         ).order_by('-submitted_at')
+
+        if request.user.role == 'supervisor':
+            qs = qs.filter(assignment__user__unit_id=request.user.unit_id) if request.user.unit_id else qs.none()
 
         supervisor_id = request.query_params.get('supervisor_id')
         task_id = request.query_params.get('task_id')
@@ -483,7 +496,14 @@ class ActivityLogView(GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrSupervisor]
 
     def get(self, request):
-        qs = ActivityLog.objects.select_related('actor', 'target_user', 'assignment')
+        qs = ActivityLog.objects.filter(tenant=request.user.tenant).select_related('actor', 'target_user', 'assignment')
+
+        if request.user.role == 'supervisor':
+            if not request.user.unit_id:
+                qs = qs.none()
+            else:
+                uid = request.user.unit_id
+                qs = qs.filter(Q(target_user__unit_id=uid) | Q(actor__unit_id=uid))
 
         action = request.query_params.get('action')
         actor_id = request.query_params.get('actor_id')
@@ -519,7 +539,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerOrSupervisor()]
 
     def get_queryset(self):
-        qs = Assignment.objects.select_related(
+        qs = Assignment.objects.filter(tenant=self.request.user.tenant).select_related(
             'user', 'task', 'shift', 'zone', 'assigned_by'
         ).prefetch_related('submission_set', 'submission_set__photos')
 
@@ -527,6 +547,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if user.role == 'employee':
             qs = qs.filter(user=user)
         else:
+            if user.role == 'supervisor':
+                qs = qs.filter(user__unit_id=user.unit_id) if user.unit_id else qs.none()
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
@@ -552,13 +574,28 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if not date_str:
             return Response({'error': 'date is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Replace all pending assignments for this date
-        Assignment.objects.filter(date=date_str, status='pending').delete()
+        tenant = request.user.tenant
+        actor = request.user
+        is_supervisor = actor.role == 'supervisor'
+        if is_supervisor and not actor.unit_id:
+            return Response({'error': 'Bir birime atanmamış şefler toplu atama yapamaz.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Replace all pending assignments for this date (this tenant, and this unit's employees if supervisor)
+        pending_qs = Assignment.objects.filter(tenant=tenant, date=date_str, status='pending')
+        if is_supervisor:
+            pending_qs = pending_qs.filter(user__unit_id=actor.unit_id)
+        pending_qs.delete()
 
         # Pre-validate and deduplicate; count assignees per task for coefficient splitting
         seen = set()
         valid_items = []
         errors = []
+
+        candidate_users = UserModel.objects.filter(tenant=tenant)
+        candidate_tasks = TaskModel.objects.filter(tenant=tenant)
+        if is_supervisor:
+            candidate_users = candidate_users.filter(unit_id=actor.unit_id)
+            candidate_tasks = candidate_tasks.filter(Q(unit_id=actor.unit_id) | Q(unit__isnull=True))
 
         for item in items:
             user_id = item.get('user_id')
@@ -569,8 +606,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 continue
             seen.add(key)
             try:
-                user = UserModel.objects.get(id=user_id)
-                task = TaskModel.objects.get(id=task_id)
+                user = candidate_users.get(id=user_id)
+                task = candidate_tasks.get(id=task_id)
             except (UserModel.DoesNotExist, TaskModel.DoesNotExist):
                 errors.append(f'Geçersiz kullanıcı ({user_id}) veya görev ({task_id}).')
                 continue
@@ -607,6 +644,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             for occ in range(1, times + 1):
                 try:
                     a = Assignment.objects.create(
+                        tenant=tenant,
                         user=vi['user'],
                         task=task,
                         zone_id=vi['zone_id'] or task.zone_id,
@@ -625,6 +663,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         logs = []
         for a in created_objs:
             logs.append(ActivityLog(
+                tenant=tenant,
                 actor=request.user,
                 actor_name=request.user.name,
                 action='bulk_assigned',
@@ -643,11 +682,18 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             'assignments': AssignmentSerializer(created_objs, many=True, context={'request': request}).data,
         })
 
+    def _unit_scope_board(self, qs, user):
+        """Manager sees the whole shop; supervisor/employee see only their own unit's assignments."""
+        if user.role in ('supervisor', 'employee'):
+            return qs.filter(user__unit_id=user.unit_id) if user.unit_id else qs.none()
+        return qs
+
     @action(detail=False, methods=['get'], url_path='store', permission_classes=[IsAuthenticated])
     def store(self, request):
-        """Returns all assignments for the current business date — accessible to all roles."""
+        """Returns today's assignments — scoped to the caller's unit (manager sees everything)."""
         today = str(get_business_date())
-        qs = Assignment.objects.filter(date=today).select_related('user', 'task', 'shift', 'zone', 'assigned_by')
+        qs = Assignment.objects.filter(tenant=request.user.tenant, date=today)
+        qs = self._unit_scope_board(qs, request.user).select_related('user', 'task', 'shift', 'zone', 'assigned_by')
         return Response(AssignmentSerializer(qs, many=True, context={'request': request}).data)
 
     @action(detail=False, methods=['get'], url_path='previous-day')
@@ -665,7 +711,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         prev = d - timedelta(days=1)
         for _ in range(7):
-            qs = Assignment.objects.filter(date=prev).select_related('user', 'task', 'zone', 'shift')
+            qs = Assignment.objects.filter(tenant=request.user.tenant, date=prev)
+            qs = self._unit_scope_board(qs, request.user).select_related('user', 'task', 'zone', 'shift')
             if qs.exists():
                 return Response(AssignmentSerializer(qs, many=True, context={'request': request}).data)
             prev -= timedelta(days=1)
@@ -678,8 +725,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return ctx
 
     def perform_create(self, serializer):
-        a = serializer.save(assigned_by=self.request.user)
+        a = serializer.save(tenant=self.request.user.tenant, assigned_by=self.request.user)
         ActivityLog.objects.create(
+            tenant=self.request.user.tenant,
             actor=self.request.user,
             actor_name=self.request.user.name,
             action='assigned',
@@ -692,6 +740,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         ActivityLog.objects.create(
+            tenant=self.request.user.tenant,
             actor=self.request.user,
             actor_name=self.request.user.name,
             action='deleted',
@@ -719,7 +768,11 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         return TaskSubmissionSerializer
 
     def get_queryset(self):
-        qs = TaskSubmission.objects.select_related(
+        user = self.request.user
+        qs = TaskSubmission.objects.filter(tenant=user.tenant)
+        if user.role == 'supervisor':
+            qs = qs.filter(assignment__user__unit_id=user.unit_id) if user.unit_id else qs.none()
+        qs = qs.select_related(
             'assignment__user', 'assignment__task', 'assignment__zone',
             'assignment__shift', 'approved_by'
         ).prefetch_related('photos')
@@ -746,11 +799,12 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         return ctx
 
     def perform_create(self, serializer):
-        submission = serializer.save()
+        submission = serializer.save(tenant=self.request.user.tenant)
         assignment = submission.assignment
         assignment.status = 'completed'
         assignment.save(update_fields=['status'])
         ActivityLog.objects.create(
+            tenant=self.request.user.tenant,
             actor=self.request.user,
             actor_name=self.request.user.name,
             action='completed',
@@ -776,6 +830,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         submission.assignment.status = 'approved'
         submission.assignment.save(update_fields=['status'])
         ActivityLog.objects.create(
+            tenant=request.user.tenant,
             actor=request.user,
             actor_name=request.user.name,
             action='approved',
@@ -805,6 +860,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             note=submission.note,
         )
         ActivityLog.objects.create(
+            tenant=request.user.tenant,
             actor=request.user,
             actor_name=request.user.name,
             action='rejected',
@@ -817,6 +873,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         )
         # Return ALL assignees of this task+date to pending so everyone must redo
         Assignment.objects.filter(
+            tenant=request.user.tenant,
             task=submission.assignment.task,
             date=submission.assignment.date,
         ).exclude(status='approved').update(status='pending')

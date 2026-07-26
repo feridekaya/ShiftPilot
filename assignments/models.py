@@ -12,6 +12,7 @@ class Assignment(models.Model):
         ('rejected', 'Rejected'),
     ]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='assignments')
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='assignments'
     )
@@ -41,6 +42,7 @@ class TaskSubmission(models.Model):
         ('rejected', 'Rejected'),
     ]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='submissions')
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submission_set')
     # Legacy single photo field — kept for backwards compat, new code uses SubmissionPhoto
     photo_url = models.URLField(blank=True, default='')
@@ -91,6 +93,7 @@ class ActivityLog(models.Model):
         ('deleted',     'Atama Silindi'),
     ]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='activity_logs')
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
         related_name='activity_logs'

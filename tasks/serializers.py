@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Zone, Shift, Task, TaskSchedule, WorkSchedule
+from .models import Zone, Unit, Shift, Task, TaskSchedule, WorkSchedule
 
 User = get_user_model()
 
@@ -11,6 +11,12 @@ VALID_DAYS = list(range(7))  # 0=Monday … 6=Sunday
 class ZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = Zone
+        fields = ['id', 'name', 'description']
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
         fields = ['id', 'name', 'description']
 
 
@@ -28,6 +34,12 @@ class TaskScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskSchedule
         fields = ['id', 'task_id', 'frequency', 'times_per_day', 'interval_hours', 'days_of_week', 'month_day', 'month']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['task_id'].queryset = Task.objects.filter(tenant=tenant)
 
     def validate(self, data):
         frequency = data.get('frequency', getattr(self.instance, 'frequency', None))
@@ -60,6 +72,10 @@ class TaskSerializer(serializers.ModelSerializer):
     zone_id = serializers.PrimaryKeyRelatedField(
         queryset=Zone.objects.all(), source='zone', write_only=True
     )
+    unit = UnitSerializer(read_only=True)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True, allow_null=True, required=False
+    )
     created_by = serializers.StringRelatedField(read_only=True)
     allowed_roles = serializers.ListField(
         child=serializers.ChoiceField(choices=VALID_ROLES), default=list
@@ -74,11 +90,19 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'category', 'zone', 'zone_id',
+            'id', 'title', 'description', 'category', 'zone', 'zone_id', 'unit', 'unit_id',
             'requires_photo', 'coefficient', 'allowed_roles',
             'allowed_genders', 'created_by', 'schedule',
             'permanent_assignees', 'permanent_assignee_ids',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['zone_id'].queryset = Zone.objects.filter(tenant=tenant)
+            self.fields['unit_id'].queryset = Unit.objects.filter(tenant=tenant)
+            self.fields['permanent_assignee_ids'].queryset = User.objects.filter(tenant=tenant)
 
     def validate_coefficient(self, value):
         if value < 1:
@@ -110,3 +134,9 @@ class WorkScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkSchedule
         fields = ['id', 'user_id', 'user_name', 'user_role', 'date', 'is_off', 'start_time', 'end_time']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = getattr(getattr(self.context.get('request'), 'user', None), 'tenant', None)
+        if tenant:
+            self.fields['user_id'].queryset = User.objects.filter(tenant=tenant)

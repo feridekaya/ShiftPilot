@@ -85,8 +85,11 @@ class ActiveBreaksView(GenericAPIView):
     serializer_class = BreakSerializer
 
     def get(self, request):
-        auto_end_overtime()
-        qs = Break.objects.filter(ended_at__isnull=True).select_related('user').order_by('started_at')
+        tenant_active = Break.objects.filter(user__tenant=request.user.tenant, ended_at__isnull=True)
+        if request.user.role == 'supervisor':
+            tenant_active = tenant_active.filter(user__unit_id=request.user.unit_id) if request.user.unit_id else tenant_active.none()
+        auto_end_overtime(tenant_active)
+        qs = tenant_active.select_related('user').order_by('started_at')
         return Response(BreakSerializer(qs, many=True).data)
 
 
@@ -115,11 +118,13 @@ class BreakListView(GenericAPIView):
 
     def get(self, request):
         user = request.user
-        qs = Break.objects.select_related('user').filter(ended_at__isnull=False)
+        qs = Break.objects.select_related('user').filter(user__tenant=user.tenant, ended_at__isnull=False)
 
         if user.role == 'employee':
             qs = qs.filter(user=user)
         else:
+            if user.role == 'supervisor':
+                qs = qs.filter(user__unit_id=user.unit_id) if user.unit_id else qs.none()
             uid = request.query_params.get('user_id')
             if uid:
                 qs = qs.filter(user_id=uid)
